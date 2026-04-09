@@ -15,21 +15,25 @@ from tqdm.contrib.concurrent import process_map
 
 # Local imports
 from ..feature_store_base import FeatureStoreBase
-from ..utils.event_utils import prepare_event
+from ..utils.event_utils import prepare_event, prepare_quirk_event
 from ..utils.detector_utils import load_detector
 
 
 class TrackMLFeatureStore(FeatureStoreBase):
     def __init__(self, hparams):
         super().__init__(hparams)
-        self.detector_path = self.hparams["detector_path"]
+        self.detector_path = self.hparams.get("detector_path", "")
+        self.dataset_mode = self.hparams.get("dataset_mode", "trackml").lower()
 
     def prepare_data(self):
-        # Find the input files
-        all_files = os.listdir(self.input_dir)
-        all_events = sorted(
-            np.unique([os.path.join(self.input_dir, event[:14]) for event in all_files])
-        )[: self.n_files]
+        if self.dataset_mode == "quirk":
+            all_events = np.arange(self.n_files, dtype=np.int64)
+        else:
+            # Find the input files
+            all_files = os.listdir(self.input_dir)
+            all_events = sorted(
+                np.unique([os.path.join(self.input_dir, event[:14]) for event in all_files])
+            )[: self.n_files]
 
         # Split the input files by number of tasks and select my chunk only
         all_events = np.array_split(all_events, self.n_tasks)[self.task]
@@ -47,7 +51,11 @@ class TrackMLFeatureStore(FeatureStoreBase):
             "geta",
             "gphi",
         ]
-        detector_orig, detector_proc = load_detector(self.detector_path)
+        if self.dataset_mode == "quirk" and (not self.detector_path or not os.path.exists(self.detector_path)):
+            detector_orig, detector_proc = None, None
+            print("No detector CSV found; using synthetic detector geometry for quirk generation.")
+        else:
+            detector_orig, detector_proc = load_detector(self.detector_path)
 
         # Prepare output
         # output_dir = os.path.expandvars(self.output_dir) FIGURE OUT HOW TO USE THIS!
@@ -55,8 +63,9 @@ class TrackMLFeatureStore(FeatureStoreBase):
         print("Writing outputs to " + self.output_dir)
 
         # Process input files with a worker pool and progress bar
+        prepare_fn = prepare_quirk_event if self.dataset_mode == "quirk" else prepare_event
         process_func = partial(
-            prepare_event,
+            prepare_fn,
             detector_orig=detector_orig,
             detector_proc=detector_proc,
             cell_features=cell_features,

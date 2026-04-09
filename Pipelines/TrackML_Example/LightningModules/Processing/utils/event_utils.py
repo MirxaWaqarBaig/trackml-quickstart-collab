@@ -17,7 +17,10 @@ from functools import partial
 import yaml
 import numpy as np
 import pandas as pd
-import trackml.dataset
+try:
+    import trackml.dataset as trackml_dataset
+except ImportError:
+    trackml_dataset = None
 
 import torch
 from torch_geometric.data import Data
@@ -26,12 +29,19 @@ from itertools import permutations
 import itertools
 
 # Locals
-from .cell_utils import get_one_event
+from .quirk_trajectory import simulate_quirk_track
+from .quirk_intersections import (
+    build_detector_module_table,
+    intersect_track_with_modules,
+    make_synthetic_detector_modules,
+)
 
 
 def get_cell_information(
     data, cell_features, detector_orig, detector_proc, endcaps, noise
 ):
+    # Import lazily so quirk-only generation does not require trackml package.
+    from .cell_utils import get_one_event
 
     event_file = data.event_file
     angles = get_one_event(event_file, detector_orig, detector_proc)
@@ -217,8 +227,13 @@ def build_event(
     min_pt=None,
     detector=None,
 ):
+    if trackml_dataset is None:
+        raise ImportError(
+            "trackml.dataset is required for TrackML feature-store mode. "
+            "Install the trackml package or run dataset_mode=quirk."
+        )
     # Get true edge list using the ordering by R' = distance from production vertex of each particle
-    hits, particles, truth = trackml.dataset.load_event(
+    hits, particles, truth = trackml_dataset.load_event(
         event_file, parts=["hits", "particles", "truth"]
     )
     hits = select_hits(hits, truth, particles, endcaps=endcaps, noise=noise, min_pt=min_pt).assign(
@@ -350,3 +365,187 @@ def prepare_event(
             logging.info("{} already exists".format(evtid))
     except Exception as inst:
         print("File:", event_file, "had exception", inst)
+
+
+def _parse_event_id(event_ref):
+    if isinstance(event_ref, (int, np.integer)):
+        return int(event_ref)
+    text = str(event_ref)
+    digits = "".join([ch for ch in text if ch.isdigit()])
+    if len(digits) >= 1:
+        return int(digits[-9:])
+    return int(abs(hash(text)) % 1_000_000_000)
+
+
+def build_quirk_event(
+    event_id,
+    detector,
+    feature_scale,
+    quirk_n_steps=6000,
+    quirk_t_max=8.0,
+    quirk_b_field=2.0,
+    quirk_charge=1.0,
+    quirk_pt=5.0,
+    quirk_pz=1.0,
+    quirk_phi0=0.0,
+    quirk_x0=0.0,
+    quirk_y0=0.0,
+    quirk_z0=0.0,
+    quirk_radial_amplitude=0.0,
+    quirk_radial_frequency=3.0,
+    quirk_radius_mm=900.0,
+    quirk_tolerance_mm=30.0,
+    quirk_max_hits=64,
+    quirk_sample_points=600,
+):
+    track = simulate_quirk_track(
+        event_id=event_id,
+        n_steps=quirk_n_steps,
+        t_max=quirk_t_max,
+        b_field=quirk_b_field,
+        charge=quirk_charge,
+        pt=quirk_pt,
+        pz=quirk_pz,
+        phi0=quirk_phi0,
+        x0=quirk_x0,
+        y0=quirk_y0,
+        z0=quirk_z0,
+        quirky_amplitude=quirk_radial_amplitude,
+        quirky_frequency=quirk_radial_frequency,
+        radius_mm=quirk_radius_mm,
+    )
+
+    module_table = (
+        build_detector_module_table(detector)
+        if detector is not None
+        else make_synthetic_detector_modules()
+    )
+    hits = intersect_track_with_modules(
+        track["xyz"],
+        module_table,
+        tolerance_mm=quirk_tolerance_mm,
+        max_hits=quirk_max_hits,
+        sample_points=quirk_sample_points,
+    )
+
+    if hits.empty or len(hits) < 2:
+        raise ValueError(
+            f"No usable module intersections for quirk event {event_id}. "
+            "Try larger quirk_tolerance_mm or different trajectory params."
+        )
+
+    pid = np.full(len(hits), event_id + 1, dtype=np.int64)
+    pt = np.full(len(hits), quirk_pt, dtype=np.float32)
+    hid = hits["hit_id"].to_numpy(dtype=np.int64)
+    modules = hits["module_index"].to_numpy(dtype=np.int64)
+    hit_weights = np.ones(len(hits), dtype=np.float32)
+
+    # Sequential edges along trajectory order.
+    edge_src = np.arange(len(hits) - 1, dtype=np.int64)
+    edge_dst = np.arange(1, len(hits), dtype=np.int64)
+    modulewise_true_edges = np.vstack([edge_src, edge_dst]).astype(np.int64)
+    layerwise_true_edges = modulewise_true_edges.copy()
+
+    edge_weights = np.ones(modulewise_true_edges.shape[1], dtype=np.float32)
+
+    X = hits[["r", "phi", "z"]].to_numpy(dtype=np.float32) / np.array(
+        feature_scale, dtype=np.float32
+    )
+
+    return (
+        X,
+        pid,
+        modules,
+        modulewise_true_edges,
+        layerwise_true_edges,
+        hid,
+        pt,
+        hit_weights,
+        edge_weights,
+    )
+
+
+def prepare_quirk_event(
+    event_ref,
+    detector_orig,
+    detector_proc,
+    cell_features,
+    output_dir=None,
+    overwrite=False,
+    cell_information=False,
+    **kwargs,
+):
+    try:
+        evtid = _parse_event_id(event_ref)
+        filename = os.path.join(output_dir, str(evtid))
+
+        if not os.path.exists(filename) or overwrite:
+            logging.info("Preparing quirk event %s", evtid)
+            feature_scale = [1000, np.pi, 1000]
+
+            (
+                X,
+                pid,
+                module_id,
+                modulewise_true_edges,
+                layerwise_true_edges,
+                hid,
+                pt,
+                hit_weights,
+                edge_weights,
+            ) = build_quirk_event(
+                evtid,
+                detector=detector_orig,
+                feature_scale=feature_scale,
+                **{
+                    k: kwargs[k]
+                    for k in [
+                        "quirk_n_steps",
+                        "quirk_t_max",
+                        "quirk_b_field",
+                        "quirk_charge",
+                        "quirk_pt",
+                        "quirk_pz",
+                        "quirk_phi0",
+                        "quirk_x0",
+                        "quirk_y0",
+                        "quirk_z0",
+                        "quirk_radial_amplitude",
+                        "quirk_radial_frequency",
+                        "quirk_radius_mm",
+                        "quirk_tolerance_mm",
+                        "quirk_max_hits",
+                        "quirk_sample_points",
+                    ]
+                    if k in kwargs
+                },
+            )
+
+            data = Data(
+                x=torch.from_numpy(X).float(),
+                pid=torch.from_numpy(pid),
+                modules=torch.from_numpy(module_id),
+                event_file=f"quirk_event_{evtid:09d}",
+                hid=torch.from_numpy(hid),
+                pt=torch.from_numpy(pt),
+                hit_weights=torch.from_numpy(hit_weights),
+                edge_weights=torch.from_numpy(edge_weights),
+            )
+            if modulewise_true_edges is not None:
+                data.modulewise_true_edges = torch.from_numpy(modulewise_true_edges)
+            if layerwise_true_edges is not None:
+                data.layerwise_true_edges = torch.from_numpy(layerwise_true_edges)
+
+            if cell_information:
+                logging.warning(
+                    "cell_information=True requested for quirk event %s, "
+                    "but no raw cell file exists. Skipping cell feature build.",
+                    evtid,
+                )
+
+            with open(filename, "wb") as pickle_file:
+                torch.save(data, pickle_file)
+        else:
+            logging.info("Quirk event %s already exists", evtid)
+    except Exception as inst:
+        print("File:", event_ref, "had exception", inst)

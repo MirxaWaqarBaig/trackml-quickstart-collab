@@ -119,6 +119,8 @@ def select_data(
     if type(events) is not list:
         events = [events]
 
+    filtered_events = []
+
     # NOTE: Cutting background by pT BY DEFINITION removes noise
     if pt_background_cut > 0 or not noise:
         for event in events:
@@ -126,6 +128,10 @@ def select_data(
 
             pt_mask = (event.pt > pt_background_cut) & (event.pid == event.pid) & (event.pid != 0)
             pt_where = torch.where(pt_mask)[0]
+
+            # Skip events that become empty after pT/noise selection.
+            if pt_where.numel() == 0:
+                continue
 
             inverse_mask = torch.zeros(pt_where.max() + 1).long()
             inverse_mask[pt_where] = torch.arange(len(pt_where))
@@ -139,7 +145,14 @@ def select_data(
                 if feature in event_keys:
                     event[feature] = event[feature][pt_mask]
 
-    for event in events:
+            if event[true_edges].shape[1] == 0:
+                continue
+
+            filtered_events.append(event)
+    else:
+        filtered_events = list(events)
+
+    for event in filtered_events:
         event_keys = event.keys() if callable(event.keys) else event.keys
 
         event.signal_true_edges = event[true_edges]
@@ -156,7 +169,13 @@ def select_data(
         
         event.signal_true_edges = event.signal_true_edges[:, edge_subset]
 
-    return events
+    filtered_events = [
+        event
+        for event in filtered_events
+        if hasattr(event, "signal_true_edges") and event.signal_true_edges.shape[1] > 0
+    ]
+
+    return filtered_events
 
 
 def reset_edge_id(subset, graph):
@@ -173,6 +192,13 @@ def reset_edge_id(subset, graph):
 def graph_intersection(
     pred_graph, truth_graph, using_weights=False, weights_bidir=None
 ):
+    if pred_graph.numel() == 0 or truth_graph.numel() == 0:
+        empty_edges = torch.empty((2, 0), dtype=torch.long)
+        empty_truth = torch.empty((0,), dtype=torch.bool)
+        if using_weights:
+            empty_weights = torch.empty((0,), dtype=torch.float)
+            return empty_edges, empty_truth, empty_weights
+        return empty_edges, empty_truth
 
     array_size = max(pred_graph.max().item(), truth_graph.max().item()) + 1
 
