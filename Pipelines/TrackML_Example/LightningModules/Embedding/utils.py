@@ -47,11 +47,15 @@ def load_dataset(
         loaded_events = []
         for event in all_events[:num]:
             try:
-                loaded_event = torch.load(event, map_location=torch.device("cpu"))
+                loaded_event = torch.load(
+                    event,
+                    map_location=torch.device("cpu"),
+                    weights_only=False,
+                )
                 loaded_event.event_file = event
-                loaded_events.append(loaded_event)                
-            except:
-                logging.info("Corrupted event file: {}".format(event))
+                loaded_events.append(loaded_event)
+            except Exception:
+                logging.exception("Failed to load event file: %s", event)
         loaded_events = select_data(
             loaded_events,
             pt_background_cut,
@@ -118,6 +122,7 @@ def select_data(
     # NOTE: Cutting background by pT BY DEFINITION removes noise
     if pt_background_cut > 0 or not noise:
         for event in events:
+            event_keys = event.keys() if callable(event.keys) else event.keys
 
             pt_mask = (event.pt > pt_background_cut) & (event.pid == event.pid) & (event.pid != 0)
             pt_where = torch.where(pt_mask)[0]
@@ -131,21 +136,22 @@ def select_data(
 
             node_features = ["cell_data", "x", "hid", "pid", "pt", "nhits", "primary"]
             for feature in node_features:
-                if feature in event.keys:
+                if feature in event_keys:
                     event[feature] = event[feature][pt_mask]
 
     for event in events:
+        event_keys = event.keys() if callable(event.keys) else event.keys
 
         event.signal_true_edges = event[true_edges]
         edge_subset = torch.ones(event.signal_true_edges.shape[1]).bool()
         
-        if "pt" in event.keys:
+        if "pt" in event_keys:
             edge_subset &= (event.pt[event[true_edges]] > pt_signal_cut).all(0)
         
-        if "primary" in event.keys:
+        if "primary" in event_keys:
             edge_subset &= (event.nhits[event[true_edges]] >= nhits_min).all(0)
             
-        if "nhits" in event.keys:
+        if "nhits" in event_keys:
             edge_subset &= ((event.primary[event[true_edges]].bool().all(0) | (not primary_only)))
         
         event.signal_true_edges = event.signal_true_edges[:, edge_subset]

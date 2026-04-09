@@ -42,7 +42,13 @@ def train(config_file="pipeline_config.yaml"):
     if common_configs["clear_directories"]:
         delete_directory(metric_learning_configs["output_dir"])
 
-    graph_builder = EmbeddingInferenceBuilder(model, metric_learning_configs["train_split"], overwrite=True, knn_max=1000, radius=metric_learning_configs["r_test"])
+    graph_builder = EmbeddingInferenceBuilder(
+        model,
+        metric_learning_configs["train_split"],
+        overwrite=True,
+        knn_max=metric_learning_configs.get("knn_max_inference", 1000),
+        radius=metric_learning_configs["r_test"],
+    )
     graph_builder.build()
 
     return graph_builder

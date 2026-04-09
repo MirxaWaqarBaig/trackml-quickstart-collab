@@ -24,7 +24,11 @@ def load_dataset(input_subdir="",
         all_events = os.listdir(input_subdir)
         all_events = sorted([os.path.join(input_subdir, event) for event in all_events])
         loaded_events = [
-            torch.load(event, map_location=torch.device("cpu"))
+            torch.load(
+                event,
+                map_location=torch.device("cpu"),
+                weights_only=False,
+            )
             for event in all_events[:num_events]
         ]
         loaded_events = select_data(

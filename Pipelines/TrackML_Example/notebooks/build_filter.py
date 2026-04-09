@@ -70,7 +70,10 @@ class FilterInferenceBuilder:
                     percent = (batch_incr / total_length) * 100
                     sys.stdout.flush()
                     sys.stdout.write(f"{percent:.01f}% inference complete \r")
-                    batch = torch.load(event_file).to(device)
+                    batch = torch.load(
+                        event_file,
+                        weights_only=False,
+                    ).to(device)
                     if (
                         not os.path.exists(
                             os.path.join(
@@ -133,7 +136,7 @@ class FilterInferenceBuilder:
 def main():
 
     checkpoint_path = "/global/cscratch1/sd/danieltm/ExaTrkX/lightning_checkpoints/TrackML_filter/ecm2jh9e/checkpoints/last.ckpt"
-    checkpoint = torch.load(checkpoint_path)
+    checkpoint = torch.load(checkpoint_path, weights_only=False)
 
     model = PyramidFilter.load_from_checkpoint(checkpoint_path).to(device)
     model.eval()

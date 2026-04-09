@@ -8,6 +8,7 @@ import yaml
 import argparse
 import logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s:%(message)s')
+import torch
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import CSVLogger
@@ -16,6 +17,17 @@ sys.path.append("../../")
 
 from Pipelines.TrackML_Example.LightningModules.GNN.Models.interaction_gnn import InteractionGNN
 from utils.convenience_utils import headline
+
+def _normalize_precision(precision):
+    if isinstance(precision, str):
+        p = precision.strip().lower()
+        if p in {"16-mixed", "fp16", "float16"}:
+            return 16
+        if p in {"32", "64", "16"}:
+            return int(p)
+        if p == "bf16":
+            return "bf16"
+    return precision
 
 def parse_args():
     """Parse command line arguments."""
@@ -34,6 +46,8 @@ def train(config_file="pipeline_config.yaml"):
     
     common_configs = all_configs["common_configs"]
     gnn_configs = all_configs["gnn_configs"]
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    torch.set_float32_matmul_precision("high")
 
     logging.info(headline("a) Initialising model" ))
 
@@ -47,7 +61,8 @@ def train(config_file="pipeline_config.yaml"):
     trainer = Trainer(
         gpus=common_configs["gpus"],
         max_epochs=gnn_configs["max_epochs"],
-        logger=logger
+        logger=logger,
+        precision=_normalize_precision(gnn_configs.get("precision", 16)),
     )
 
     trainer.fit(model)
@@ -66,4 +81,3 @@ if __name__ == "__main__":
     config_file = args.config
 
     train(config_file)    
-

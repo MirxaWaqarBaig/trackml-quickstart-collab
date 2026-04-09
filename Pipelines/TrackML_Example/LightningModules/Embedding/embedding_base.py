@@ -265,7 +265,16 @@ class EmbeddingBase(LightningModule):
 
         return loss
 
-    def shared_evaluation(self, batch, batch_idx, knn_radius, knn_num, log=False, verbose=False):
+    def shared_evaluation(
+        self,
+        batch,
+        batch_idx,
+        knn_radius,
+        knn_num,
+        log=False,
+        verbose=False,
+        compute_loss=True,
+    ):
 
         input_data = self.get_input_data(batch)
         spatial = self(input_data)
@@ -281,13 +290,16 @@ class EmbeddingBase(LightningModule):
 
         e_spatial, y_cluster = self.get_truth(batch, e_spatial, e_bidir)
 
-        hinge, d = self.get_hinge_distance(
-            spatial, e_spatial.to(self.device), y_cluster
-        )
+        d = None
+        loss = None
+        if compute_loss:
+            hinge, d = self.get_hinge_distance(
+                spatial, e_spatial.to(self.device), y_cluster
+            )
 
-        loss = torch.nn.functional.hinge_embedding_loss(
-            d, hinge, margin=self.hparams["margin"]**2, reduction="mean"
-        )
+            loss = torch.nn.functional.hinge_embedding_loss(
+                d, hinge, margin=self.hparams["margin"]**2, reduction="mean"
+            )
 
         cluster_true = e_bidir.shape[1]
         cluster_true_positive = y_cluster.sum()
@@ -296,7 +308,7 @@ class EmbeddingBase(LightningModule):
         eff = cluster_true_positive / cluster_true
         pur = cluster_true_positive / cluster_positive
 
-        if log:
+        if log and loss is not None:
             current_lr = self.optimizers().param_groups[0]["lr"]
             self.log_dict(
                 {"val_loss": loss, "eff": eff, "pur": pur, "current_lr": current_lr},

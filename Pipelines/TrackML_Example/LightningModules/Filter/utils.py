@@ -17,11 +17,15 @@ def load_dataset(input_dir, num, pt_background_cut, pt_signal_cut, true_edges, n
         loaded_events = []
         for event in all_events[:num]:
             try:
-                loaded_event = torch.load(event, map_location=torch.device("cpu"))
+                loaded_event = torch.load(
+                    event,
+                    map_location=torch.device("cpu"),
+                    weights_only=False,
+                )
                 loaded_events.append(loaded_event)
                 logging.info("Loaded event: {}".format(loaded_event.event_file))
-            except:
-                logging.info("Corrupted event file: {}".format(event))
+            except Exception:
+                logging.exception("Failed to load event file: %s", event)
         loaded_events = select_data(
             loaded_events, pt_background_cut, pt_signal_cut, true_edges, noise
         )
@@ -100,7 +104,11 @@ class LargeDataset(Dataset):
         return len(self.input_paths)
 
     def get(self, idx):
-        data = torch.load(self.input_paths[idx], map_location=torch.device("cpu"))
+        data = torch.load(
+            self.input_paths[idx],
+            map_location=torch.device("cpu"),
+            weights_only=False,
+        )
         
         # Order edges by increasing module ID
         if "volume_id" in data.keys:

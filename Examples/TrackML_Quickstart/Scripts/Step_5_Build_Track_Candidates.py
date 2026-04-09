@@ -62,7 +62,14 @@ def train(config_file="pipeline_config.yaml"):
     all_graphs = []
     for subdir in ["train", "val", "test"]:
         subdir_graphs = os.listdir(os.path.join(gnn_configs["output_dir"], subdir))
-        all_graphs += [torch.load(os.path.join(gnn_configs["output_dir"], subdir, graph), map_location="cpu") for graph in subdir_graphs]
+        all_graphs += [
+            torch.load(
+                os.path.join(gnn_configs["output_dir"], subdir, graph),
+                map_location="cpu",
+                weights_only=False,
+            )
+            for graph in subdir_graphs
+        ]
 
     logging.info(headline( "b) Labelling graph nodes" ) )
 

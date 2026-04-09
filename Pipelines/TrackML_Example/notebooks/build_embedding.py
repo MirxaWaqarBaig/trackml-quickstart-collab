@@ -44,7 +44,10 @@ class EmbeddingInferenceBuilder:
                             )
                         )
                     ) or self.overwrite:
-                        batch = torch.load(event_file).to(self.model.device)
+                        batch = torch.load(
+                            event_file,
+                            weights_only=False,
+                        ).to(self.model.device)
                         self.construct_downstream(batch, datatype)
 
     def prepare_datastructure(self):
@@ -74,10 +77,14 @@ class EmbeddingInferenceBuilder:
     def construct_downstream(self, batch, datatype):
 
         batch = self.select_data(batch)
+        target_device = batch.x.device
         
         y_cluster, e_spatial, e_bidir = self.get_performance(
             batch=batch, r_max=self.radius, k_max=self.knn_max
         )
+        y_cluster = y_cluster.to(target_device)
+        e_spatial = e_spatial.to(target_device)
+        e_bidir = e_bidir.to(target_device)
         
         module_mask = batch.modules[e_spatial[0]] != batch.modules[e_spatial[1]]
         y_cluster, e_spatial = y_cluster[module_mask], e_spatial[:, module_mask]
@@ -87,9 +94,15 @@ class EmbeddingInferenceBuilder:
         e_spatial = e_spatial[:, (R_dist[e_spatial[0]] <= R_dist[e_spatial[1]])]
 
         e_spatial, y_cluster = self.model.get_truth(batch, e_spatial, e_bidir)
+        e_spatial = e_spatial.to(target_device)
+        y_cluster = y_cluster.to(target_device)
 
         # Re-introduce random direction, to avoid training bias
-        random_flip = torch.randint(2, (e_spatial.shape[1],)).bool()
+        random_flip = torch.randint(
+            2,
+            (e_spatial.shape[1],),
+            device=target_device,
+        ).bool()
         e_spatial[0, random_flip], e_spatial[1, random_flip] = (
             e_spatial[1, random_flip],
             e_spatial[0, random_flip],
@@ -102,7 +115,13 @@ class EmbeddingInferenceBuilder:
 
     def get_performance(self, batch, r_max, k_max):
         with torch.no_grad():
-            results = self.model.shared_evaluation(batch, 0, r_max, k_max)
+            results = self.model.shared_evaluation(
+                batch,
+                0,
+                r_max,
+                k_max,
+                compute_loss=False,
+            )
 
         return results["truth"], results["preds"], results["truth_graph"]
 
@@ -114,11 +133,12 @@ class EmbeddingInferenceBuilder:
             torch.save(batch, pickle_file)
             
     def select_data(self, event):
+        event_keys = event.keys() if callable(event.keys) else event.keys
     
         event.signal_true_edges = event.modulewise_true_edges
         
         if (
-            ("pt" in event.keys and self.model.hparams["pt_signal_cut"] > 0)
+            ("pt" in event_keys and self.model.hparams["pt_signal_cut"] > 0)
         ):
             edge_subset = (
                 (event.pt[event.signal_true_edges] > self.model.hparams["pt_signal_cut"]).all(0)

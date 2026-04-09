@@ -33,7 +33,11 @@ def label_graph(
         if not os.path.exists(output_file) or overwrite:
 
             logging.info("Preparing event {}".format(output_file))
-            graph = torch.load(input_file, map_location="cpu")
+            graph = torch.load(
+                input_file,
+                map_location="cpu",
+                weights_only=False,
+            )
 
             # apply cut
             passing_edges = graph.edge_index[:, graph.scores > edge_cut]

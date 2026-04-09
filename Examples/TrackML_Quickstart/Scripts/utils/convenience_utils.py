@@ -70,19 +70,21 @@ def plot_training_metrics(metrics):
     cmap = viridis(3)
 
     for idx, y in enumerate(['train_loss', 'val_loss']):
-        p1.circle(y=y, x='epoch', source=source, color=cmap[idx], legend_label=y)
+        p1.circle(y=y, x='epoch', source=source, color=cmap[idx], legend_label=y, size=6)
         p1.line(x='epoch', y=y, source=source, color=cmap[idx], legend_label=y)
 
 
     p2 = figure(title='Purity on validation set', x_axis_label='Epoch', y_axis_label='Purity')
-    p2.circle(y='pur', x='epoch', source=source, color=cmap[0], legend_label='Purity')
+    p2.circle(y='pur', x='epoch', source=source, color=cmap[0], legend_label='Purity', size=6)
     p2.line(x='epoch', y='pur', source=source, color=cmap[0], legend_label='Purity')
 
     p3 = figure(title='Efficiency on validation set', x_axis_label='Epoch', y_axis_label='Efficiency')
-    p3.circle(y='eff', x='epoch', source=source, color=cmap[0], legend_label='Efficiency')
+    p3.circle(y='eff', x='epoch', source=source, color=cmap[0], legend_label='Efficiency', size=6)
     p3.line(x='epoch', y='eff', source=source, color=cmap[0], legend_label='Efficiency')
 
-    show(row([p1,p2, p3]))
+    layout = row([p1, p2, p3])
+    show(layout)
+    return {"layout": layout, "figures": [p1, p2, p3]}
 
 def plot_neighbor_performance(model):
 
@@ -108,23 +110,26 @@ def plot_neighbor_performance(model):
     x='radius'
     for idx, y in enumerate(['eff', 'pur', 'loss']):
         figures.append( figure(title=titles[idx], x_axis_label=x, y_axis_label=y) )
-        figures[-1].circle(y=y, x=x, source=source, color=cmap[0], legend_label=y)
+        figures[-1].circle(y=y, x=x, source=source, color=cmap[0], legend_label=y, size=6)
         figures[-1].line(x=x, y=y, source=source, color=cmap[0], legend_label=y)
         y_val = results[y][(results[x] - model.hparams["r_test"]).abs().idxmin()].item()
         label = Label(x=model.hparams["r_test"], y=y_val, x_offset=10, y_offset=-10, text=f"@ radius = {model.hparams['r_test']}, \n" + y + " = "+str(round(y_val, 3)), border_line_color='black', border_line_alpha=1.0,
         background_fill_color='white', background_fill_alpha=0.8)
         figures[-1].add_layout(label)
 
-    show(row(figures))
+    layout = row(figures)
+    show(layout)
+    return {"layout": layout, "figures": figures}
 
 def plot_true_graph(sample_data, num_tracks=100):
 
+    sample_data = sample_data.cpu()
     p = figure(title='Truth graph', x_axis_label='x', y_axis_label='y', height=800, width=800) 
  
     true_edges = sample_data.signal_true_edges
     true_unique, true_lengths = sample_data.pid[true_edges[0]].unique(return_counts=True)
     pid = sample_data.pid
-    r, phi, z = sample_data.cpu().x.T
+    r, phi, z = sample_data.x.T
     x, y = r * np.cos(phi * np.pi), r * np.sin(phi * np.pi)
     cmap = viridis(num_tracks)
     source = ColumnDataSource(dict(x=x.numpy(), y=y.numpy()))
@@ -141,21 +146,25 @@ def plot_true_graph(sample_data, num_tracks=100):
         p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
         
     show(p)
+    return p
 
 def plot_predicted_graph(model):
 
-    # from matplotlib import pyplot as plt
+    model = model.to(device)
     test_data = model.testset[0].to(device)
-    test_results = model.to(device).shared_evaluation(test_data.to(device), 0, model.hparams["r_test"], 1000, log=False)
+    test_results = model.shared_evaluation(
+        test_data, 0, model.hparams["r_test"], 1000, log=False
+    )
+    test_data = test_data.cpu()
 
     p = figure(title='Truth graphs', x_axis_label='x', y_axis_label='y', height=500, width=500) 
     q = figure(title='Predicted graphs', x_axis_label='x', y_axis_label='y', height=500, width=500) 
 
-    true_edges = test_results['truth_graph']
-    true_unique, true_lengths = test_data.pid[true_edges[0]].unique(return_counts=True)
-    pred_edges = test_results['preds']
+    true_edges = test_results['truth_graph'].cpu()
+    pred_edges = test_results['preds'].cpu()
     pid = test_data.pid
-    r, phi, z = test_data.cpu().x.T
+    true_unique, true_lengths = pid[true_edges[0]].unique(return_counts=True)
+    r, phi, z = test_data.x.T
     x, y = r * np.cos(phi * np.pi), r * np.sin(phi * np.pi)
     cmap = viridis(11)
     source = ColumnDataSource(dict(x=x.numpy(), y=y.numpy()))
@@ -181,16 +190,23 @@ def plot_predicted_graph(model):
         q.circle(X, Y, color=cmap[i], size=5)
         q.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
         
-    show(row([p,q]))
+    layout = row([p, q])
+    show(layout)
+    return {"layout": layout, "figures": [p, q]}
 
 def plot_track_lengths(model):
 
     all_true_edges = []
     all_pred_edges = []
+    model = model.to(device)
     test_data = model.testset[0].to(device)
     signal_true_edges = test_data.signal_true_edges
-    test_results = model.to(device).shared_evaluation(test_data.to(device), 0, model.hparams["r_test"], 1000, log=False)
-    pred_edges = test_results['preds']
+    test_results = model.shared_evaluation(
+        test_data, 0, model.hparams["r_test"], 1000, log=False
+    )
+    test_data = test_data.cpu()
+    signal_true_edges = signal_true_edges.cpu()
+    pred_edges = test_results['preds'].cpu()
     pid = test_data.pid
     for track_id in test_data.pid.unique():
         e = signal_true_edges[:, pid[ signal_true_edges[0]] == track_id ]
@@ -225,7 +241,9 @@ def plot_track_lengths(model):
     p2 =  figure(title='Histogram of predicted track lengths', x_axis_label='Edges', y_axis_label='Count', height=400, width=400) 
     p1.quad(bottom=0, top='true_hist', left='low', right='high', source=ColumnDataSource(true_histogram))
     p2.quad(bottom=0, top='pred_hist', left='low', right='high', source=ColumnDataSource(pred_histogram))
-    show(row([p1,p2]))
+    layout = row([p1, p2])
+    show(layout)
+    return {"layout": layout, "figures": [p1, p2]}
 
 def plot_graph_sizes(model):
 
@@ -237,10 +255,11 @@ def plot_graph_sizes(model):
             graph_sizes.append(results['preds'].shape[1])
 
     # Make histogram of graph sizes
-    plt.figure(figsize=(10,5))
-    plt.hist(graph_sizes);
-    plt.title('Histogram of predicted graph sizes');
-    plt.xlabel('Number of edges');
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.hist(graph_sizes)
+    ax.set_title('Histogram of predicted graph sizes')
+    ax.set_xlabel('Number of edges')
+    return fig
 
 def plot_edge_performance(model):
 
@@ -275,11 +294,13 @@ def plot_edge_performance(model):
     x='score cut'
     for idx, y in enumerate(['eff', 'pur']):
         figures.append( figure(title=titles[idx], x_axis_label=x, y_axis_label=y) )
-        figures[-1].circle(y=y, x=x, source=source, color=cmap[0], legend_label=y)
+        figures[-1].circle(y=y, x=x, source=source, color=cmap[0], legend_label=y, size=6)
         figures[-1].line(x=x, y=y, source=source, color=cmap[0], legend_label=y)
         y_val = results[y][(results[x] - 0.5).abs().idxmin()].item()
         label = Label(x=0.1, y=y_val, x_offset=10, y_offset=-10, text="@ score cut = 0.5, \n" + y + " = "+str(round(y_val, 3)) + "\n AUC: "+str(auc), border_line_color='black', border_line_alpha=1.0,
         background_fill_color='white', background_fill_alpha=0.8)
         figures[-1].add_layout(label)
 
-    show(row(figures))
+    layout = row(figures)
+    show(layout)
+    return {"layout": layout, "figures": figures}

@@ -322,7 +322,10 @@ class SingleFileFilterBuilder(FilterBuilder):
                     percent = (batch_incr / total_length) * 100
                     sys.stdout.flush()
                     sys.stdout.write(f"{percent:.01f}% inference complete \r")
-                    batch = torch.load(event_file).to(pl_module.device)
+                    batch = torch.load(
+                        event_file,
+                        weights_only=False,
+                    ).to(pl_module.device)
                     if (
                         not os.path.exists(
                             os.path.join(
