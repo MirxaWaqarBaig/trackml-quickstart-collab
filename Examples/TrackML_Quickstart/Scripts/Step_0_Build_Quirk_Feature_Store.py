@@ -1,5 +1,6 @@
 """
-Build synthetic quirk feature-store events for the TrackML quickstart workflow.
+Build quirk+SM mixed feature-store events for the TrackML quickstart workflow.
+Requires real TrackML detector geometry and TrackML event CSV files.
 """
 
 import argparse
@@ -21,7 +22,17 @@ def parse_args():
         "--n-files",
         type=int,
         default=None,
-        help="Override number of synthetic events to generate.",
+        help="Override number of quirk events to generate.",
+    )
+    parser.add_argument(
+        "--detector-path",
+        default=None,
+        help="Override path to TrackML detectors.csv.",
+    )
+    parser.add_argument(
+        "--input-dir",
+        default=None,
+        help="Override TrackML input directory containing '*-hits.csv' files.",
     )
     return parser.parse_args()
 
@@ -51,6 +62,10 @@ def main():
     hparams["output_dir"] = str(quickstart_dir / "datasets" / "quickstart_quirk_example")
     if args.n_files is not None:
         hparams["n_files"] = int(args.n_files)
+    if args.detector_path is not None:
+        hparams["detector_path"] = str(Path(args.detector_path).resolve())
+    if args.input_dir is not None:
+        hparams["input_dir"] = str(Path(args.input_dir).resolve())
 
     os.makedirs(hparams["output_dir"], exist_ok=True)
 
@@ -62,6 +77,8 @@ def main():
     print(f"Building quirk feature store with config: {cfg_path}")
     print(f"Output directory: {hparams['output_dir']}")
     print(f"Number of events: {hparams['n_files']}")
+    print(f"Detector path: {hparams.get('detector_path', '')}")
+    print(f"TrackML input dir: {hparams.get('input_dir', '')}")
 
     store = TrackMLFeatureStore(hparams)
     store.prepare_data()

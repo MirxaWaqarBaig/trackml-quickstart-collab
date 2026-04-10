@@ -1,32 +1,21 @@
 common_configs:
-  experiment_name: trackml_quickstart_quirk
+  experiment_name: trackml_quickstart_1
   artifact_directory: artifacts
   gpus: 1
   clear_directories: True
 
 metric_learning_configs:
   # Dataset parameters
-  input_dir: datasets/quickstart_quirk_example
+  input_dir: datasets/quickstart_example_1GeV
   output_dir: datasets/quickstart_metric_learning_processed
   pt_signal_cut: 1.
   pt_background_cut: 1.
   train_split: [80, 10, 10] # Number of [training, validation, testing] examples
   true_edges: modulewise_true_edges
-  quirky_transform: False # Keep disabled for physics-driven pair trajectory mode
-  quirky_amplitude: 0.003 # Used only if quirky_transform=True
-  quirky_frequency: 4.0 # Used only if quirky_transform=True
-  quirky_mode: phi_only # Used only if quirky_transform=True (phi_only, phi_and_r)
-
-  # Adaptive edge filtering in cylindrical coordinates
-  adaptive_edge_filter: True
-  adaptive_dr_mm: 180.0
-  adaptive_dphi_mm: 180.0
-  adaptive_dz_mm: 260.0
-  adaptive_pt_coeff: 120.0
 
   # Model parameters
   spatial_channels: 3
-  cell_channels: 0
+  cell_channels: 9
   emb_hidden: 1024
   nb_layer: 4
   emb_dim: 12
@@ -45,7 +34,7 @@ metric_learning_configs:
   factor: 0.7
   patience: 4
   regime: [rp, hnm, norm]
-  max_epochs: 50
+  max_epochs: 2
 
 gnn_configs:
   # Dataset parameters
@@ -54,7 +43,7 @@ gnn_configs:
   edge_cut: 0.5
   pt_signal_min: 1.
   pt_background_min: 1.
-  datatype_names: [train, val, test] # Which directory prefixes to use, assuming at least a train dataset
+  datatype_names: [train, val, test] # Which directory prefixes to use, assuming at least a train dataset 
   datatype_split: [80, 10, 10] # Number of [training, validation, testing] examples
   noise: False
 
@@ -77,7 +66,7 @@ gnn_configs:
   truth_key: pid_signal
   regime: [pid]
   mask_background: True
-  max_epochs: 30
+  max_epochs: 2
 
 track_building_configs:
   score_cut: 0.9

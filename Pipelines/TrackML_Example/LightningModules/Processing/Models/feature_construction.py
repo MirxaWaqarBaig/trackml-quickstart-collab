@@ -51,11 +51,17 @@ class TrackMLFeatureStore(FeatureStoreBase):
             "geta",
             "gphi",
         ]
-        if self.dataset_mode == "quirk" and (not self.detector_path or not os.path.exists(self.detector_path)):
-            detector_orig, detector_proc = None, None
-            print("No detector CSV found; using synthetic detector geometry for quirk generation.")
-        else:
-            detector_orig, detector_proc = load_detector(self.detector_path)
+        if self.dataset_mode == "quirk":
+            if not self.detector_path or not os.path.exists(self.detector_path):
+                raise FileNotFoundError(
+                    "dataset_mode=quirk requires a valid detector_path to TrackML detectors.csv."
+                )
+            if not self.input_dir or not os.path.exists(self.input_dir):
+                raise FileNotFoundError(
+                    "dataset_mode=quirk requires input_dir with TrackML '*-hits.csv' files for SM background and module centers."
+                )
+
+        detector_orig, detector_proc = load_detector(self.detector_path)
 
         # Prepare output
         # output_dir = os.path.expandvars(self.output_dir) FIGURE OUT HOW TO USE THIS!

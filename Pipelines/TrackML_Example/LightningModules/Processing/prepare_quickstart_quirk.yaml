@@ -2,7 +2,7 @@
 dataset_mode: quirk
 input_dir: ${EXATRKX_DATA}/train_all
 output_dir: Examples/TrackML_Quickstart/datasets/quickstart_quirk_example
-detector_path: ""
+detector_path: ${EXATRKX_DATA}/detectors.csv
 n_files: 100
 n_workers: 32
 n_tasks: 1
@@ -20,15 +20,21 @@ quirk_n_steps: 6000
 quirk_t_max: 8.0
 quirk_b_field: 2.0
 quirk_charge: 1.0
-quirk_pt: 2.0
-quirk_pz: 0.2
+quirk_mass: 1000.0
+quirk_pair_pt: 2.0
+quirk_pair_pz: 0.2
+quirk_opening_angle: 1.57079632679
 quirk_phi0: 0.0
 quirk_x0: 0.0
 quirk_y0: 0.0
 quirk_z0: 0.0
-quirk_radial_amplitude: 0.0
-quirk_radial_frequency: 3.0
-quirk_radius_mm: 900.0
+quirk_string_tension: 0.02
+quirk_oscillation_jitter: 0.0
 quirk_tolerance_mm: 120.0
-quirk_max_hits: 64
+quirk_max_hits: 96
 quirk_sample_points: 600
+
+# SM background mixing
+include_sm_background: True
+sm_background_pt_min: 0.5
+sm_background_max_hits: 3000

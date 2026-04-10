@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pathlib import Path
 
 
 def _pick_column(frame, candidates):
@@ -9,24 +10,151 @@ def _pick_column(frame, candidates):
     return None
 
 
-def build_detector_module_table(detector_df):
+def estimate_module_centers_from_hits(input_dir, max_events=20):
+    """
+    Build module centers from TrackML hit CSV files.
+    """
+    base = Path(input_dir)
+    hits_files = sorted(base.glob("*-hits.csv"))[: int(max(1, max_events))]
+    if not hits_files:
+        raise FileNotFoundError(
+            f"No '*-hits.csv' files found in {input_dir}; cannot estimate module centers."
+        )
+
+    frames = []
+    for file_path in hits_files:
+        frame = pd.read_csv(
+            file_path,
+            usecols=["x", "y", "z", "volume_id", "layer_id", "module_id"],
+        )
+        frames.append(frame)
+
+    hits = pd.concat(frames, axis=0, ignore_index=True)
+    grouped = (
+        hits.groupby(["volume_id", "layer_id", "module_id"], as_index=False)
+        .agg(
+            cx=("x", "mean"),
+            cy=("y", "mean"),
+            cz=("z", "mean"),
+            spread_x=("x", "std"),
+            spread_y=("y", "std"),
+            spread_z=("z", "std"),
+            n_hits=("x", "size"),
+        )
+        .fillna(0.0)
+    )
+    return grouped
+
+
+def build_detector_module_table(detector_df, module_centers_df=None):
     """
     Build a module-center table from detector geometry.
     """
-    x_col = _pick_column(detector_df, ["cx", "module_x", "x"])
-    y_col = _pick_column(detector_df, ["cy", "module_y", "y"])
-    z_col = _pick_column(detector_df, ["cz", "module_z", "z"])
-
-    required = ["volume_id", "layer_id", "module_id", x_col, y_col, z_col]
-    if any(col is None for col in [x_col, y_col, z_col]):
-        raise ValueError(
-            "Detector CSV must contain module center columns (cx, cy, cz) or equivalents."
+    if module_centers_df is not None:
+        table = detector_df.merge(
+            module_centers_df[
+                ["volume_id", "layer_id", "module_id", "cx", "cy", "cz", "spread_x", "spread_y", "spread_z"]
+            ],
+            on=["volume_id", "layer_id", "module_id"],
+            how="left",
         )
+    else:
+        table = detector_df.copy()
 
-    table = detector_df[required].copy()
+    x_col = _pick_column(table, ["cx", "module_x", "x"])
+    y_col = _pick_column(table, ["cy", "module_y", "y"])
+    z_col = _pick_column(table, ["cz", "module_z", "z"])
+    if any(col is None for col in [x_col, y_col, z_col]):
+        raise ValueError("Could not resolve detector module centers (cx, cy, cz).")
+
+    keep_cols = ["volume_id", "layer_id", "module_id", x_col, y_col, z_col]
+    for extra in [
+        "spread_x",
+        "spread_y",
+        "spread_z",
+        "rot_xu",
+        "rot_yu",
+        "rot_zu",
+        "rot_xv",
+        "rot_yv",
+        "rot_zv",
+        "rot_xw",
+        "rot_yw",
+        "rot_zw",
+        "module_minhu",
+        "module_maxhu",
+        "module_hv",
+    ]:
+        if extra in table.columns:
+            keep_cols.append(extra)
+
+    table = table[keep_cols].copy()
     table = table.rename(columns={x_col: "cx", y_col: "cy", z_col: "cz"})
     table = table.reset_index(drop=True)
     table["module_index"] = table.index.astype(np.int64)
+    table = table.dropna(subset=["cx", "cy", "cz"]).reset_index(drop=True)
+    table["module_index"] = table.index.astype(np.int64)
+
+    # Build local frame and module dimensions.
+    if {"rot_xu", "rot_yu", "rot_zu"}.issubset(table.columns):
+        u = table[["rot_xu", "rot_yu", "rot_zu"]].to_numpy(dtype=np.float32)
+    else:
+        # Tangential approximation in transverse plane.
+        phi = np.arctan2(table["cy"].to_numpy(), table["cx"].to_numpy())
+        u = np.stack([-np.sin(phi), np.cos(phi), np.zeros_like(phi)], axis=1).astype(np.float32)
+
+    if {"rot_xv", "rot_yv", "rot_zv"}.issubset(table.columns):
+        v = table[["rot_xv", "rot_yv", "rot_zv"]].to_numpy(dtype=np.float32)
+    else:
+        v = np.tile(np.array([0.0, 0.0, 1.0], dtype=np.float32), (len(table), 1))
+
+    if {"rot_xw", "rot_yw", "rot_zw"}.issubset(table.columns):
+        n = table[["rot_xw", "rot_yw", "rot_zw"]].to_numpy(dtype=np.float32)
+    else:
+        c = table[["cx", "cy", "cz"]].to_numpy(dtype=np.float32)
+        n = c / (np.linalg.norm(c, axis=1, keepdims=True) + 1e-12)
+
+    def _norm_rows(arr):
+        return arr / (np.linalg.norm(arr, axis=1, keepdims=True) + 1e-12)
+
+    u = _norm_rows(u)
+    v = _norm_rows(v)
+    n = _norm_rows(n)
+
+    table["ux"], table["uy"], table["uz"] = u[:, 0], u[:, 1], u[:, 2]
+    table["vx"], table["vy"], table["vz"] = v[:, 0], v[:, 1], v[:, 2]
+    table["nx"], table["ny"], table["nz"] = n[:, 0], n[:, 1], n[:, 2]
+
+    if {"module_minhu", "module_maxhu"}.issubset(table.columns):
+        half_u = np.maximum(
+            np.abs(table["module_minhu"].to_numpy(dtype=np.float32)),
+            np.abs(table["module_maxhu"].to_numpy(dtype=np.float32)),
+        )
+    else:
+        spread_x = (
+            table["spread_x"].to_numpy(dtype=np.float32)
+            if "spread_x" in table.columns
+            else np.zeros(len(table), dtype=np.float32)
+        )
+        spread_y = (
+            table["spread_y"].to_numpy(dtype=np.float32)
+            if "spread_y" in table.columns
+            else np.zeros(len(table), dtype=np.float32)
+        )
+        half_u = np.maximum(5.0, np.sqrt(spread_x**2 + spread_y**2) * 2.0)
+
+    if "module_hv" in table.columns:
+        half_v = np.abs(table["module_hv"].to_numpy(dtype=np.float32))
+    else:
+        spread_z = (
+            table["spread_z"].to_numpy(dtype=np.float32)
+            if "spread_z" in table.columns
+            else np.zeros(len(table), dtype=np.float32)
+        )
+        half_v = np.maximum(5.0, np.abs(spread_z) * 2.0)
+
+    table["half_u"] = np.clip(half_u, 2.0, 200.0)
+    table["half_v"] = np.clip(half_v, 2.0, 400.0)
     return table
 
 
@@ -69,8 +197,7 @@ def intersect_track_with_modules(
     sample_points=600,
 ):
     """
-    Approximate intersections by snapping sampled trajectory points to nearest
-    detector module centers within `tolerance_mm`.
+    Approximate intersections against module planes and finite module bounds.
     """
     if len(track_xyz) == 0:
         return pd.DataFrame()
@@ -81,24 +208,50 @@ def intersect_track_with_modules(
     sampled_xyz = track_xyz[sample_idx]
 
     centers = detector_modules[["cx", "cy", "cz"]].to_numpy(dtype=np.float32)
-    delta = sampled_xyz[:, None, :] - centers[None, :, :]
-    d2 = np.sum(delta * delta, axis=2)
-
-    nearest_mod = np.argmin(d2, axis=1)
-    nearest_d = np.sqrt(d2[np.arange(sampled_xyz.shape[0]), nearest_mod])
-    keep = nearest_d <= float(tolerance_mm)
-
-    if not np.any(keep):
-        return pd.DataFrame()
+    normals = detector_modules[["nx", "ny", "nz"]].to_numpy(dtype=np.float32)
+    uvec = detector_modules[["ux", "uy", "uz"]].to_numpy(dtype=np.float32)
+    vvec = detector_modules[["vx", "vy", "vz"]].to_numpy(dtype=np.float32)
+    half_u = detector_modules["half_u"].to_numpy(dtype=np.float32)
+    half_v = detector_modules["half_v"].to_numpy(dtype=np.float32)
 
     selected = []
     last_module = None
-    for idx, mod_i, dist in zip(sample_idx[keep], nearest_mod[keep], nearest_d[keep]):
-        if last_module == int(mod_i):
+    max_hits = int(max_hits)
+    tol = float(tolerance_mm)
+    coarse_tol2 = (4.0 * tol) ** 2
+
+    for idx, p in zip(sample_idx, sampled_xyz):
+        delta = p[None, :] - centers
+        d2 = np.sum(delta * delta, axis=1)
+        candidates = np.where(d2 <= coarse_tol2)[0]
+        if len(candidates) == 0:
+            candidates = np.array([int(np.argmin(d2))], dtype=np.int64)
+
+        best = None
+        best_score = None
+        for mod_i in candidates:
+            d = delta[mod_i]
+            plane_dist = abs(float(np.dot(d, normals[mod_i])))
+            if plane_dist > tol:
+                continue
+            du = abs(float(np.dot(d, uvec[mod_i])))
+            dv = abs(float(np.dot(d, vvec[mod_i])))
+            if du > float(half_u[mod_i] + tol) or dv > float(half_v[mod_i] + tol):
+                continue
+            score = plane_dist + 0.01 * (du + dv)
+            if best_score is None or score < best_score:
+                best_score = score
+                best = (int(mod_i), plane_dist)
+
+        if best is None:
             continue
-        selected.append((int(idx), int(mod_i), float(dist)))
-        last_module = int(mod_i)
-        if len(selected) >= int(max_hits):
+
+        mod_i, dist = best
+        if last_module == mod_i:
+            continue
+        selected.append((int(idx), mod_i, float(dist)))
+        last_module = mod_i
+        if len(selected) >= max_hits:
             break
 
     if len(selected) < 2:

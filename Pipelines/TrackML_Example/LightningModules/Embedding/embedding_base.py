@@ -24,7 +24,12 @@ from torch_cluster import radius_graph
 import numpy as np
 
 # Local Imports
-from .utils import graph_intersection, split_datasets, build_edges
+from .utils import (
+    graph_intersection,
+    split_datasets,
+    build_edges,
+    adaptive_cylindrical_edge_filter,
+)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -287,6 +292,7 @@ class EmbeddingBase(LightningModule):
         e_spatial = build_edges(
             spatial, spatial, indices=None, r_max=knn_radius, k_max=knn_num
         )
+        e_spatial = adaptive_cylindrical_edge_filter(e_spatial, batch, self.hparams)
 
         e_spatial, y_cluster = self.get_truth(batch, e_spatial, e_bidir)
 

@@ -29,12 +29,14 @@ from itertools import permutations
 import itertools
 
 # Locals
-from .quirk_trajectory import simulate_quirk_track
+from .quirk_trajectory import simulate_quirk_pair_tracks
 from .quirk_intersections import (
     build_detector_module_table,
+    estimate_module_centers_from_hits,
     intersect_track_with_modules,
-    make_synthetic_detector_modules,
 )
+
+_MODULE_TABLE_CACHE = {}
 
 
 def get_cell_information(
@@ -377,75 +379,213 @@ def _parse_event_id(event_ref):
     return int(abs(hash(text)) % 1_000_000_000)
 
 
+def _trackml_event_prefixes(input_dir):
+    base = str(input_dir)
+    if not base:
+        return []
+    candidates = sorted(
+        {
+            path[: -len("-hits.csv")]
+            for path in [
+                os.path.join(base, filename)
+                for filename in os.listdir(base)
+                if filename.endswith("-hits.csv")
+            ]
+        }
+    )
+    return candidates
+
+
+def _load_trackml_background_hits(
+    event_prefix,
+    module_table,
+    sm_pt_min=0.1,
+    sm_max_hits=4000,
+):
+    hits = pd.read_csv(event_prefix + "-hits.csv")
+    truth = pd.read_csv(event_prefix + "-truth.csv")
+    particles = pd.read_csv(event_prefix + "-particles.csv")
+
+    truth = truth.assign(pt=np.sqrt(truth.tpx**2 + truth.tpy**2))
+    truth = truth[truth.pt >= float(sm_pt_min)]
+    truth = truth[truth.particle_id != 0]
+    if len(truth) == 0:
+        return pd.DataFrame()
+
+    vertex = particles[["particle_id", "vx", "vy", "vz"]]
+    truth = truth.merge(vertex, on="particle_id", how="left")
+
+    merged = hits.merge(
+        truth[["hit_id", "particle_id", "pt", "vx", "vy", "vz"]],
+        on="hit_id",
+        how="inner",
+    )
+    if len(merged) == 0:
+        return pd.DataFrame()
+
+    merged = merged.merge(
+        module_table[["volume_id", "layer_id", "module_id", "module_index"]],
+        on=["volume_id", "layer_id", "module_id"],
+        how="inner",
+    )
+    if len(merged) == 0:
+        return pd.DataFrame()
+
+    merged = merged.assign(
+        r=np.sqrt(merged.x**2 + merged.y**2),
+        phi=np.arctan2(merged.y, merged.x),
+    )
+    merged = merged.assign(
+        order_key=np.sqrt(
+            (merged.x - merged.vx) ** 2 + (merged.y - merged.vy) ** 2 + (merged.z - merged.vz) ** 2
+        )
+    )
+    merged = merged.sort_values(["particle_id", "order_key"]).reset_index(drop=True)
+
+    if len(merged) > int(sm_max_hits):
+        merged = merged.iloc[: int(sm_max_hits)].copy()
+
+    return merged
+
+
+def _build_edges_from_group_order(hits_df):
+    edge_src = []
+    edge_dst = []
+    for _, grp in hits_df.groupby("particle_id", sort=False):
+        idx = grp.index.to_numpy(dtype=np.int64)
+        if len(idx) < 2:
+            continue
+        edge_src.extend(idx[:-1].tolist())
+        edge_dst.extend(idx[1:].tolist())
+    if len(edge_src) == 0:
+        return np.empty((2, 0), dtype=np.int64)
+    return np.vstack([np.array(edge_src, dtype=np.int64), np.array(edge_dst, dtype=np.int64)])
+
+
+def _get_module_table(detector, input_dir):
+    cache_key = (id(detector), str(input_dir))
+    if cache_key in _MODULE_TABLE_CACHE:
+        return _MODULE_TABLE_CACHE[cache_key]
+    module_centers = estimate_module_centers_from_hits(input_dir)
+    module_table = build_detector_module_table(detector, module_centers_df=module_centers)
+    _MODULE_TABLE_CACHE[cache_key] = module_table
+    return module_table
+
+
 def build_quirk_event(
     event_id,
     detector,
+    input_dir,
     feature_scale,
     quirk_n_steps=6000,
     quirk_t_max=8.0,
     quirk_b_field=2.0,
     quirk_charge=1.0,
-    quirk_pt=5.0,
-    quirk_pz=1.0,
+    quirk_mass=1000.0,
+    quirk_pair_pt=5.0,
+    quirk_pair_pz=1.0,
+    quirk_opening_angle=np.pi / 2.0,
     quirk_phi0=0.0,
     quirk_x0=0.0,
     quirk_y0=0.0,
     quirk_z0=0.0,
-    quirk_radial_amplitude=0.0,
-    quirk_radial_frequency=3.0,
-    quirk_radius_mm=900.0,
+    quirk_string_tension=0.02,
+    quirk_oscillation_jitter=0.0,
     quirk_tolerance_mm=30.0,
-    quirk_max_hits=64,
+    quirk_max_hits=96,
     quirk_sample_points=600,
+    include_sm_background=True,
+    sm_background_pt_min=0.5,
+    sm_background_max_hits=3000,
 ):
-    track = simulate_quirk_track(
+    pair = simulate_quirk_pair_tracks(
         event_id=event_id,
         n_steps=quirk_n_steps,
         t_max=quirk_t_max,
         b_field=quirk_b_field,
         charge=quirk_charge,
-        pt=quirk_pt,
-        pz=quirk_pz,
+        quirk_mass=quirk_mass,
+        pair_pt=quirk_pair_pt,
+        pair_pz=quirk_pair_pz,
+        opening_angle=quirk_opening_angle,
         phi0=quirk_phi0,
         x0=quirk_x0,
         y0=quirk_y0,
         z0=quirk_z0,
-        quirky_amplitude=quirk_radial_amplitude,
-        quirky_frequency=quirk_radial_frequency,
-        radius_mm=quirk_radius_mm,
+        string_tension=quirk_string_tension,
+        oscillation_jitter=quirk_oscillation_jitter,
     )
 
-    module_table = (
-        build_detector_module_table(detector)
-        if detector is not None
-        else make_synthetic_detector_modules()
-    )
-    hits = intersect_track_with_modules(
-        track["xyz"],
+    if detector is None:
+        raise ValueError(
+            "dataset_mode=quirk now requires real TrackML detector geometry. "
+            "Provide detector_path and input_dir with TrackML hit CSV files."
+        )
+
+    module_table = _get_module_table(detector, input_dir)
+
+    hits_q = intersect_track_with_modules(
+        pair["xyz_q"],
         module_table,
         tolerance_mm=quirk_tolerance_mm,
         max_hits=quirk_max_hits,
         sample_points=quirk_sample_points,
     )
+    hits_q["particle_id"] = np.int64(2 * event_id + 1)
+    hits_q["q_label"] = "quirk"
+    hits_q["pt"] = float(max(1e-4, 0.5 * quirk_pair_pt))
+    hits_q["order_key"] = np.linspace(0.0, 1.0, len(hits_q), dtype=np.float32)
 
-    if hits.empty or len(hits) < 2:
+    hits_aq = intersect_track_with_modules(
+        pair["xyz_aq"],
+        module_table,
+        tolerance_mm=quirk_tolerance_mm,
+        max_hits=quirk_max_hits,
+        sample_points=quirk_sample_points,
+    )
+    hits_aq["particle_id"] = np.int64(2 * event_id + 2)
+    hits_aq["q_label"] = "anti_quirk"
+    hits_aq["pt"] = float(max(1e-4, 0.5 * quirk_pair_pt))
+    hits_aq["order_key"] = np.linspace(0.0, 1.0, len(hits_aq), dtype=np.float32)
+
+    hits = pd.concat([hits_q, hits_aq], ignore_index=True)
+
+    if include_sm_background:
+        prefixes = _trackml_event_prefixes(input_dir)
+        if prefixes:
+            bg_prefix = prefixes[event_id % len(prefixes)]
+            bg_hits = _load_trackml_background_hits(
+                bg_prefix,
+                module_table,
+                sm_pt_min=sm_background_pt_min,
+                sm_max_hits=sm_background_max_hits,
+            )
+            if len(bg_hits) > 0:
+                bg_hits = bg_hits.assign(q_label="sm")
+                hits = pd.concat([hits, bg_hits], ignore_index=True, sort=False)
+
+    if hits.empty or len(hits) < 4:
         raise ValueError(
             f"No usable module intersections for quirk event {event_id}. "
             "Try larger quirk_tolerance_mm or different trajectory params."
         )
 
-    pid = np.full(len(hits), event_id + 1, dtype=np.int64)
-    pt = np.full(len(hits), quirk_pt, dtype=np.float32)
+    # Re-index and build sequential true edges per particle.
+    hits = hits.sort_values(["particle_id", "order_key"]).reset_index(drop=True)
+    hits["hit_id"] = np.arange(len(hits), dtype=np.int64)
+    modulewise_true_edges = _build_edges_from_group_order(hits)
+    layerwise_true_edges = modulewise_true_edges.copy()
+    if modulewise_true_edges.shape[1] == 0:
+        raise ValueError(
+            f"No valid truth edges formed for quirk event {event_id}. "
+            "Check quirk/SM generation settings."
+        )
+
+    pid = hits["particle_id"].to_numpy(dtype=np.int64)
+    pt = hits["pt"].to_numpy(dtype=np.float32)
     hid = hits["hit_id"].to_numpy(dtype=np.int64)
     modules = hits["module_index"].to_numpy(dtype=np.int64)
     hit_weights = np.ones(len(hits), dtype=np.float32)
-
-    # Sequential edges along trajectory order.
-    edge_src = np.arange(len(hits) - 1, dtype=np.int64)
-    edge_dst = np.arange(1, len(hits), dtype=np.int64)
-    modulewise_true_edges = np.vstack([edge_src, edge_dst]).astype(np.int64)
-    layerwise_true_edges = modulewise_true_edges.copy()
-
     edge_weights = np.ones(modulewise_true_edges.shape[1], dtype=np.float32)
 
     X = hits[["r", "phi", "z"]].to_numpy(dtype=np.float32) / np.array(
@@ -496,6 +636,7 @@ def prepare_quirk_event(
             ) = build_quirk_event(
                 evtid,
                 detector=detector_orig,
+                input_dir=kwargs.get("input_dir", ""),
                 feature_scale=feature_scale,
                 **{
                     k: kwargs[k]
@@ -504,18 +645,22 @@ def prepare_quirk_event(
                         "quirk_t_max",
                         "quirk_b_field",
                         "quirk_charge",
-                        "quirk_pt",
-                        "quirk_pz",
+                        "quirk_mass",
+                        "quirk_pair_pt",
+                        "quirk_pair_pz",
+                        "quirk_opening_angle",
                         "quirk_phi0",
                         "quirk_x0",
                         "quirk_y0",
                         "quirk_z0",
-                        "quirk_radial_amplitude",
-                        "quirk_radial_frequency",
-                        "quirk_radius_mm",
+                        "quirk_string_tension",
+                        "quirk_oscillation_jitter",
                         "quirk_tolerance_mm",
                         "quirk_max_hits",
                         "quirk_sample_points",
+                        "include_sm_background",
+                        "sm_background_pt_min",
+                        "sm_background_max_hits",
                     ]
                     if k in kwargs
                 },

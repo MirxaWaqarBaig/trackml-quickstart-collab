@@ -303,6 +303,59 @@ def build_edges(
         return edge_list
 
 
+def adaptive_cylindrical_edge_filter(edge_list, batch, hparams):
+    """
+    Apply geometry- and pT-aware filtering on candidate edges.
+
+    Expects batch.x in normalized cylindrical features:
+    - r_norm = r_mm / 1000
+    - phi_norm = phi_rad / pi
+    - z_norm = z_mm / 1000
+    """
+    if edge_list.numel() == 0:
+        return edge_list
+
+    if not hparams.get("adaptive_edge_filter", False):
+        return edge_list
+
+    if not hasattr(batch, "x") or batch.x.shape[1] < 3:
+        return edge_list
+
+    src = edge_list[0].long()
+    dst = edge_list[1].long()
+
+    r_mm = batch.x[:, 0].float() * 1000.0
+    phi = batch.x[:, 1].float() * np.pi
+    z_mm = batch.x[:, 2].float() * 1000.0
+
+    dr = torch.abs(r_mm[src] - r_mm[dst])
+    dphi = torch.abs(phi[src] - phi[dst])
+    dphi = torch.minimum(dphi, 2.0 * np.pi - dphi)
+    r_bar = 0.5 * (r_mm[src] + r_mm[dst])
+    d_rphi = r_bar * dphi
+    dz = torch.abs(z_mm[src] - z_mm[dst])
+
+    if hasattr(batch, "pt"):
+        pt_src = batch.pt[src].float().clamp_min(1e-3)
+        pt_dst = batch.pt[dst].float().clamp_min(1e-3)
+        pt_pair = torch.minimum(pt_src, pt_dst)
+    else:
+        pt_pair = torch.ones_like(dr)
+
+    # Dynamic windows: lower-pT tracks can bend/oscillate more, so open windows by 1/pt.
+    dr_base = float(hparams.get("adaptive_dr_mm", 180.0))
+    dphi_base = float(hparams.get("adaptive_dphi_mm", 180.0))
+    dz_base = float(hparams.get("adaptive_dz_mm", 260.0))
+    pt_coeff = float(hparams.get("adaptive_pt_coeff", 120.0))
+
+    dr_max = dr_base + pt_coeff / pt_pair
+    dphi_max = dphi_base + pt_coeff / pt_pair
+    dz_max = dz_base + pt_coeff / pt_pair
+
+    keep = (dr <= dr_max) & (d_rphi <= dphi_max) & (dz <= dz_max)
+    return edge_list[:, keep]
+
+
 def build_knn(spatial, k):
 
     if device == "cuda":
