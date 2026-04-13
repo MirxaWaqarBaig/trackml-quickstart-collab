@@ -57,13 +57,21 @@ def build_detector_module_table(detector_df, module_centers_df=None):
             ],
             on=["volume_id", "layer_id", "module_id"],
             how="left",
+            suffixes=("", "_hits"),
         )
+        # Prefer detector geometry centers when available; fallback to hit-derived centers.
+        for coord in ["cx", "cy", "cz"]:
+            hit_col = f"{coord}_hits"
+            if coord not in table.columns and hit_col in table.columns:
+                table[coord] = table[hit_col]
+            elif coord in table.columns and hit_col in table.columns:
+                table[coord] = table[coord].fillna(table[hit_col])
     else:
         table = detector_df.copy()
 
-    x_col = _pick_column(table, ["cx", "module_x", "x"])
-    y_col = _pick_column(table, ["cy", "module_y", "y"])
-    z_col = _pick_column(table, ["cz", "module_z", "z"])
+    x_col = _pick_column(table, ["cx", "cx_x", "cx_y", "module_x", "x"])
+    y_col = _pick_column(table, ["cy", "cy_x", "cy_y", "module_y", "y"])
+    z_col = _pick_column(table, ["cz", "cz_x", "cz_y", "module_z", "z"])
     if any(col is None for col in [x_col, y_col, z_col]):
         raise ValueError("Could not resolve detector module centers (cx, cy, cz).")
 
