@@ -23,6 +23,26 @@ from Pipelines.TrackML_Example.LightningModules.Embedding.Models.layerless_embed
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
+SOURCE_COLOR_MAP = {
+    0: "#c7c7c7",  # SM background (light gray)
+    1: "#00B8FF",  # quirk (bright cyan)
+    2: "#FF2D95",  # anti-quirk (bright magenta)
+}
+
+
+def _xy_from_cylindrical(x_tensor):
+    r, phi, _ = x_tensor.T
+    return r * np.cos(phi * np.pi), r * np.sin(phi * np.pi)
+
+
+def _get_source_labels(data):
+    if hasattr(data, "source_label"):
+        src = data.source_label
+        if torch.is_tensor(src):
+            return src.cpu().long().numpy()
+    return None
+
+
 def headline(message):
     buffer_len = (80 - len(message))//2 if len(message) < 80 else 0
     return "-"*buffer_len + ' ' + message + ' ' + '-'*buffer_len
@@ -129,21 +149,39 @@ def plot_true_graph(sample_data, num_tracks=100):
     true_edges = sample_data.signal_true_edges
     true_unique, true_lengths = sample_data.pid[true_edges[0]].unique(return_counts=True)
     pid = sample_data.pid
-    r, phi, z = sample_data.x.T
-    x, y = r * np.cos(phi * np.pi), r * np.sin(phi * np.pi)
-    cmap = viridis(num_tracks)
-    source = ColumnDataSource(dict(x=x.numpy(), y=y.numpy()))
-    p.circle(x='x', y='y', source=source, color=cmap[0], size=1, alpha=0.1)
+    x, y = _xy_from_cylindrical(sample_data.x)
+    x_np = x.numpy()
+    y_np = y.numpy()
+    src_labels = _get_source_labels(sample_data)
+
+    if src_labels is None:
+        cmap = viridis(num_tracks)
+        source = ColumnDataSource(dict(x=x_np, y=y_np))
+        p.circle(x='x', y='y', source=source, color=cmap[0], size=1, alpha=0.1)
+    else:
+        for label, color in SOURCE_COLOR_MAP.items():
+            mask = src_labels == label
+            if mask.sum() == 0:
+                continue
+            alpha = 0.22 if label == 0 else 0.85
+            size = 2 if label == 0 else 5
+            p.circle(x_np[mask], y_np[mask], color=color, size=size, alpha=alpha, legend_label={0: "SM", 1: "Quirk", 2: "Anti-Quirk"}[label])
 
     for i, track in enumerate(true_unique[true_lengths >= 5][:num_tracks]):
         # Get true track plot
         track_true_edges = true_edges[:, pid[ true_edges[0]] == track ]
+        if track_true_edges.shape[1] == 0:
+            continue
         X_edges, Y_edges = x[track_true_edges].numpy(), y[track_true_edges].numpy()
-        X = np.concatenate(X_edges)
-        Y = np.concatenate(Y_edges)
-
-        p.circle(X, Y, color=cmap[i], size=5)
-        p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        if src_labels is None:
+            cmap = viridis(num_tracks)
+            p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        else:
+            label_val = int(src_labels[track_true_edges[0][0].item()]) if track_true_edges.shape[1] > 0 else 0
+            edge_color = SOURCE_COLOR_MAP.get(label_val, "#888888")
+            width = 1 if label_val == 0 else 2
+            alpha = 0.18 if label_val == 0 else 0.9
+            p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=edge_color, line_alpha=alpha, line_width=width)
         
     show(p)
     return p
@@ -164,31 +202,68 @@ def plot_predicted_graph(model):
     pred_edges = test_results['preds'].cpu()
     pid = test_data.pid
     true_unique, true_lengths = pid[true_edges[0]].unique(return_counts=True)
-    r, phi, z = test_data.x.T
-    x, y = r * np.cos(phi * np.pi), r * np.sin(phi * np.pi)
+    x, y = _xy_from_cylindrical(test_data.x)
+    x_np = x.numpy()
+    y_np = y.numpy()
+    src_labels = _get_source_labels(test_data)
     cmap = viridis(11)
-    source = ColumnDataSource(dict(x=x.numpy(), y=y.numpy()))
+    source = ColumnDataSource(dict(x=x_np, y=y_np))
     p.circle(x='x', y='y', source=source, color=cmap[0], size=1, alpha=0.1)
     q.circle(x='x', y='y', source=source, color=cmap[0], size=1, alpha=0.1)
+
+    if src_labels is not None:
+        for fig in [p, q]:
+            for label, color in SOURCE_COLOR_MAP.items():
+                mask = src_labels == label
+                if mask.sum() == 0:
+                    continue
+                alpha = 0.2 if label == 0 else 0.9
+                size = 2 if label == 0 else 5
+                fig.circle(
+                    x_np[mask],
+                    y_np[mask],
+                    color=color,
+                    size=size,
+                    alpha=alpha,
+                    legend_label={0: "SM", 1: "Quirk", 2: "Anti-Quirk"}[label],
+                )
 
     for i, track in enumerate(true_unique[true_lengths >= 10][:10]):
         # Get true track plot
         track_true_edges = true_edges[:, pid[ true_edges[0]] == track ]
+        if track_true_edges.shape[1] == 0:
+            continue
         X_edges, Y_edges = x[track_true_edges].numpy(), y[track_true_edges].numpy()
-        X = np.concatenate(X_edges)
-        Y = np.concatenate(Y_edges)
-
-        p.circle(X, Y, color=cmap[i], size=5)
-        p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        if src_labels is None:
+            p.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        else:
+            label_val = int(src_labels[track_true_edges[0][0].item()]) if track_true_edges.shape[1] > 0 else 0
+            edge_color = SOURCE_COLOR_MAP.get(label_val, "#888888")
+            p.multi_line(
+                X_edges.T.tolist(),
+                Y_edges.T.tolist(),
+                color=edge_color,
+                line_alpha=0.2 if label_val == 0 else 0.95,
+                line_width=1 if label_val == 0 else 2,
+            )
 
         track_pred_edges = pred_edges[:, (pid[pred_edges] == track).any(0)]
+        if track_pred_edges.shape[1] == 0:
+            continue
 
         X_edges, Y_edges = x[track_pred_edges].numpy(), y[track_pred_edges].numpy()
-        X = np.concatenate(X_edges)
-        Y = np.concatenate(Y_edges)
-
-        q.circle(X, Y, color=cmap[i], size=5)
-        q.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        if src_labels is None:
+            q.multi_line(X_edges.T.tolist(), Y_edges.T.tolist(), color=cmap[i])
+        else:
+            label_val = int(src_labels[track_pred_edges[0][0].item()]) if track_pred_edges.shape[1] > 0 else 0
+            edge_color = SOURCE_COLOR_MAP.get(label_val, "#888888")
+            q.multi_line(
+                X_edges.T.tolist(),
+                Y_edges.T.tolist(),
+                color=edge_color,
+                line_alpha=0.2 if label_val == 0 else 0.95,
+                line_width=1 if label_val == 0 else 2,
+            )
         
     layout = row([p, q])
     show(layout)

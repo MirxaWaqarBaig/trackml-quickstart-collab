@@ -491,31 +491,20 @@ def build_quirk_event(
     quirk_z0=0.0,
     quirk_string_tension=0.02,
     quirk_oscillation_jitter=0.0,
+    quirk_velocity_scale=1500.0,
     quirk_tolerance_mm=30.0,
     quirk_max_hits=96,
     quirk_sample_points=600,
     include_sm_background=True,
     sm_background_pt_min=0.5,
     sm_background_max_hits=3000,
+    quirk_pairs_per_event=1,
+    quirk_pair_pt_jitter_frac=0.15,
+    quirk_pair_phi_spread=0.35,
+    min_quirk_hits_per_track=8,
+    min_total_quirk_hits=20,
+    quirk_event_max_retries=5,
 ):
-    pair = simulate_quirk_pair_tracks(
-        event_id=event_id,
-        n_steps=quirk_n_steps,
-        t_max=quirk_t_max,
-        b_field=quirk_b_field,
-        charge=quirk_charge,
-        quirk_mass=quirk_mass,
-        pair_pt=quirk_pair_pt,
-        pair_pz=quirk_pair_pz,
-        opening_angle=quirk_opening_angle,
-        phi0=quirk_phi0,
-        x0=quirk_x0,
-        y0=quirk_y0,
-        z0=quirk_z0,
-        string_tension=quirk_string_tension,
-        oscillation_jitter=quirk_oscillation_jitter,
-    )
-
     if detector is None:
         raise ValueError(
             "dataset_mode=quirk now requires real TrackML detector geometry. "
@@ -523,32 +512,87 @@ def build_quirk_event(
         )
 
     module_table = _get_module_table(detector, input_dir)
+    quirk_pairs_per_event = int(max(1, quirk_pairs_per_event))
+    quirk_event_max_retries = int(max(1, quirk_event_max_retries))
+    quirk_pid_base = np.int64(event_id) * np.int64(100000)
+    hits = pd.DataFrame()
+    last_quirk_hits = 0
 
-    hits_q = intersect_track_with_modules(
-        pair["xyz_q"],
-        module_table,
-        tolerance_mm=quirk_tolerance_mm,
-        max_hits=quirk_max_hits,
-        sample_points=quirk_sample_points,
-    )
-    hits_q["particle_id"] = np.int64(2 * event_id + 1)
-    hits_q["q_label"] = "quirk"
-    hits_q["pt"] = float(max(1e-4, 0.5 * quirk_pair_pt))
-    hits_q["order_key"] = np.linspace(0.0, 1.0, len(hits_q), dtype=np.float32)
+    for retry in range(quirk_event_max_retries):
+        rng = np.random.default_rng(int(event_id) * 1000 + retry)
+        quirk_frames = []
+        tol_retry = float(quirk_tolerance_mm) * (1.0 + 0.2 * retry)
 
-    hits_aq = intersect_track_with_modules(
-        pair["xyz_aq"],
-        module_table,
-        tolerance_mm=quirk_tolerance_mm,
-        max_hits=quirk_max_hits,
-        sample_points=quirk_sample_points,
-    )
-    hits_aq["particle_id"] = np.int64(2 * event_id + 2)
-    hits_aq["q_label"] = "anti_quirk"
-    hits_aq["pt"] = float(max(1e-4, 0.5 * quirk_pair_pt))
-    hits_aq["order_key"] = np.linspace(0.0, 1.0, len(hits_aq), dtype=np.float32)
+        for pair_idx in range(quirk_pairs_per_event):
+            phi_delta = float(rng.uniform(-quirk_pair_phi_spread, quirk_pair_phi_spread))
+            pt_jitter = 1.0 + float(
+                rng.uniform(-quirk_pair_pt_jitter_frac, quirk_pair_pt_jitter_frac)
+            )
+            pair_pt_i = float(max(1e-4, quirk_pair_pt * pt_jitter))
 
-    hits = pd.concat([hits_q, hits_aq], ignore_index=True)
+            pair = simulate_quirk_pair_tracks(
+                event_id=event_id * 100 + pair_idx + 10000 * retry,
+                n_steps=quirk_n_steps,
+                t_max=quirk_t_max,
+                b_field=quirk_b_field,
+                charge=quirk_charge,
+                quirk_mass=quirk_mass,
+                pair_pt=pair_pt_i,
+                pair_pz=quirk_pair_pz,
+                opening_angle=quirk_opening_angle,
+                phi0=quirk_phi0 + phi_delta,
+                x0=quirk_x0,
+                y0=quirk_y0,
+                z0=quirk_z0,
+                string_tension=quirk_string_tension,
+                oscillation_jitter=quirk_oscillation_jitter,
+                velocity_scale=quirk_velocity_scale,
+            )
+
+            hits_q = intersect_track_with_modules(
+                pair["xyz_q"],
+                module_table,
+                tolerance_mm=tol_retry,
+                max_hits=quirk_max_hits,
+                sample_points=quirk_sample_points,
+            )
+            hits_aq = intersect_track_with_modules(
+                pair["xyz_aq"],
+                module_table,
+                tolerance_mm=tol_retry,
+                max_hits=quirk_max_hits,
+                sample_points=quirk_sample_points,
+            )
+
+            # Enforce per-track minimum for signal quality in mixed events.
+            if len(hits_q) < int(min_quirk_hits_per_track) or len(hits_aq) < int(
+                min_quirk_hits_per_track
+            ):
+                continue
+
+            pid_q = quirk_pid_base + np.int64(2 * pair_idx + 1)
+            pid_aq = quirk_pid_base + np.int64(2 * pair_idx + 2)
+
+            hits_q["particle_id"] = pid_q
+            hits_q["q_label"] = "quirk"
+            hits_q["source_label"] = np.int64(1)
+            hits_q["pt"] = float(max(1e-4, 0.5 * pair_pt_i))
+            hits_q["order_key"] = np.linspace(0.0, 1.0, len(hits_q), dtype=np.float32)
+
+            hits_aq["particle_id"] = pid_aq
+            hits_aq["q_label"] = "anti_quirk"
+            hits_aq["source_label"] = np.int64(2)
+            hits_aq["pt"] = float(max(1e-4, 0.5 * pair_pt_i))
+            hits_aq["order_key"] = np.linspace(0.0, 1.0, len(hits_aq), dtype=np.float32)
+            quirk_frames.extend([hits_q, hits_aq])
+
+        if quirk_frames:
+            hits = pd.concat(quirk_frames, ignore_index=True)
+            last_quirk_hits = int((hits["source_label"] > 0).sum())
+            if last_quirk_hits >= int(min_total_quirk_hits):
+                break
+        else:
+            last_quirk_hits = 0
 
     if include_sm_background:
         prefixes = _trackml_event_prefixes(input_dir)
@@ -562,12 +606,21 @@ def build_quirk_event(
             )
             if len(bg_hits) > 0:
                 bg_hits = bg_hits.assign(q_label="sm")
+                bg_hits = bg_hits.assign(source_label=np.int64(0))
                 hits = pd.concat([hits, bg_hits], ignore_index=True, sort=False)
 
     if hits.empty or len(hits) < 4:
         raise ValueError(
             f"No usable module intersections for quirk event {event_id}. "
             "Try larger quirk_tolerance_mm or different trajectory params."
+        )
+
+    total_quirk_hits = int((hits["source_label"] > 0).sum()) if "source_label" in hits else 0
+    if total_quirk_hits < int(min_total_quirk_hits):
+        raise ValueError(
+            f"Insufficient quirk signal for event {event_id}: only {total_quirk_hits} "
+            f"hits (required >= {int(min_total_quirk_hits)}). "
+            "Increase quirk_tolerance_mm, quirk_pairs_per_event, or lower min thresholds."
         )
 
     # Re-index and build sequential true edges per particle.
@@ -582,6 +635,7 @@ def build_quirk_event(
         )
 
     pid = hits["particle_id"].to_numpy(dtype=np.int64)
+    source_label = hits["source_label"].to_numpy(dtype=np.int64)
     pt = hits["pt"].to_numpy(dtype=np.float32)
     hid = hits["hit_id"].to_numpy(dtype=np.int64)
     modules = hits["module_index"].to_numpy(dtype=np.int64)
@@ -596,6 +650,7 @@ def build_quirk_event(
         X,
         pid,
         modules,
+        source_label,
         modulewise_true_edges,
         layerwise_true_edges,
         hid,
@@ -627,6 +682,7 @@ def prepare_quirk_event(
                 X,
                 pid,
                 module_id,
+                source_label,
                 modulewise_true_edges,
                 layerwise_true_edges,
                 hid,
@@ -655,12 +711,19 @@ def prepare_quirk_event(
                         "quirk_z0",
                         "quirk_string_tension",
                         "quirk_oscillation_jitter",
+                        "quirk_velocity_scale",
                         "quirk_tolerance_mm",
                         "quirk_max_hits",
                         "quirk_sample_points",
                         "include_sm_background",
                         "sm_background_pt_min",
                         "sm_background_max_hits",
+                        "quirk_pairs_per_event",
+                        "quirk_pair_pt_jitter_frac",
+                        "quirk_pair_phi_spread",
+                        "min_quirk_hits_per_track",
+                        "min_total_quirk_hits",
+                        "quirk_event_max_retries",
                     ]
                     if k in kwargs
                 },
@@ -669,6 +732,7 @@ def prepare_quirk_event(
             data = Data(
                 x=torch.from_numpy(X).float(),
                 pid=torch.from_numpy(pid),
+                source_label=torch.from_numpy(source_label),
                 modules=torch.from_numpy(module_id),
                 event_file=f"quirk_event_{evtid:09d}",
                 hid=torch.from_numpy(hid),

@@ -38,6 +38,7 @@ def simulate_quirk_pair_tracks(
     z0=0.0,
     string_tension=0.02,
     oscillation_jitter=0.0,
+    velocity_scale=1500.0,
 ):
     """
     Integrate coupled quirk/anti-quirk trajectories in a uniform B field.
@@ -58,7 +59,8 @@ def simulate_quirk_pair_tracks(
     pair_pz = float(pair_pz)
     opening_angle = float(np.clip(opening_angle, 1e-3, np.pi - 1e-3))
     string_tension = float(max(0.0, string_tension))
-    inv_mass = 1.0 / quirk_mass
+    # `velocity_scale` maps momentum-like inputs to practical detector-scale motion (mm).
+    inv_mass = float(max(1e-6, velocity_scale)) / quirk_mass
 
     # Split pair momentum into COM drift + opposite components in transverse plane.
     p_com = np.array(
