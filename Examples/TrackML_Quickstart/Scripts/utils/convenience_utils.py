@@ -39,7 +39,10 @@ def _get_source_labels(data):
     if hasattr(data, "source_label"):
         src = data.source_label
         if torch.is_tensor(src):
-            return src.cpu().long().numpy()
+            src_np = src.cpu().long().numpy()
+            # Guard against stale/mismatched tensors from older cached files.
+            if src_np.shape[0] == data.x.shape[0]:
+                return src_np
     return None
 
 

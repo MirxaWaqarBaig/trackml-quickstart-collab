@@ -30,16 +30,18 @@ quirk_y0: 0.0
 quirk_z0: 0.0
 quirk_string_tension: 0.02
 quirk_oscillation_jitter: 0.0
-quirk_velocity_scale: 1500.0
-quirk_tolerance_mm: 120.0
+quirk_velocity_scale: 2000.0
+quirk_tolerance_mm: 260.0
 quirk_max_hits: 96
 quirk_sample_points: 600
-quirk_pairs_per_event: 2
+quirk_pairs_per_event: 4
 quirk_pair_pt_jitter_frac: 0.2
-quirk_pair_phi_spread: 0.5
-min_quirk_hits_per_track: 4
-min_total_quirk_hits: 12
-quirk_event_max_retries: 6
+quirk_pair_phi_spread: 1.2
+quirk_opening_angle_jitter: 0.35
+quirk_origin_jitter_mm: 40.0
+min_quirk_hits_per_track: 2
+min_total_quirk_hits: 6
+quirk_event_max_retries: 15
 
 # SM background mixing
 include_sm_background: True

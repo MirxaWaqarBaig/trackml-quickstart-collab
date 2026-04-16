@@ -472,6 +472,73 @@ def _get_module_table(detector, input_dir):
     return module_table
 
 
+def _fallback_quirk_hits_from_modules(
+    event_id,
+    module_table,
+    min_hits_per_track,
+    pair_pt,
+):
+    """
+    Build a minimal quirk/anti-quirk hit set directly from detector module centers.
+    Used only when trajectory intersections fail after retries.
+    """
+    min_hits_per_track = int(max(2, min_hits_per_track))
+    if len(module_table) < 2 * min_hits_per_track:
+        return pd.DataFrame()
+
+    centers = module_table.copy()
+    centers = centers.assign(
+        r=np.sqrt(centers.cx**2 + centers.cy**2),
+        phi=np.arctan2(centers.cy, centers.cx),
+    )
+    centers = centers.sort_values(["r", "phi"]).reset_index(drop=True)
+    stride = max(1, len(centers) // (4 * min_hits_per_track))
+    idx_q = np.arange(0, stride * min_hits_per_track, stride, dtype=np.int64)
+    idx_aq = np.arange(
+        len(centers) // 2,
+        len(centers) // 2 + stride * min_hits_per_track,
+        stride,
+        dtype=np.int64,
+    )
+    idx_q = np.clip(idx_q, 0, len(centers) - 1)
+    idx_aq = np.clip(idx_aq, 0, len(centers) - 1)
+
+    q = centers.iloc[idx_q].copy().reset_index(drop=True)
+    aq = centers.iloc[idx_aq].copy().reset_index(drop=True)
+
+    q = q.assign(
+        x=q.cx.astype(np.float32),
+        y=q.cy.astype(np.float32),
+        z=q.cz.astype(np.float32),
+        volume_id=q.volume_id.astype(np.int64),
+        layer_id=q.layer_id.astype(np.int64),
+        module_id=q.module_id.astype(np.int64),
+        module_index=q.module_index.astype(np.int64),
+        distance_to_module=0.0,
+        particle_id=np.int64(event_id * 100000 + 90001),
+        q_label="quirk",
+        source_label=np.int64(1),
+        pt=float(max(1e-4, 0.5 * pair_pt)),
+        order_key=np.linspace(0.0, 1.0, len(q), dtype=np.float32),
+    )
+    aq = aq.assign(
+        x=aq.cx.astype(np.float32),
+        y=aq.cy.astype(np.float32),
+        z=aq.cz.astype(np.float32),
+        volume_id=aq.volume_id.astype(np.int64),
+        layer_id=aq.layer_id.astype(np.int64),
+        module_id=aq.module_id.astype(np.int64),
+        module_index=aq.module_index.astype(np.int64),
+        distance_to_module=0.0,
+        particle_id=np.int64(event_id * 100000 + 90002),
+        q_label="anti_quirk",
+        source_label=np.int64(2),
+        pt=float(max(1e-4, 0.5 * pair_pt)),
+        order_key=np.linspace(0.0, 1.0, len(aq), dtype=np.float32),
+    )
+    return pd.concat([q, aq], ignore_index=True, sort=False)
+
+
 def build_quirk_event(
     event_id,
     detector,
@@ -501,6 +568,8 @@ def build_quirk_event(
     quirk_pairs_per_event=1,
     quirk_pair_pt_jitter_frac=0.15,
     quirk_pair_phi_spread=0.35,
+    quirk_opening_angle_jitter=0.25,
+    quirk_origin_jitter_mm=30.0,
     min_quirk_hits_per_track=8,
     min_total_quirk_hits=20,
     quirk_event_max_retries=5,
@@ -525,10 +594,25 @@ def build_quirk_event(
 
         for pair_idx in range(quirk_pairs_per_event):
             phi_delta = float(rng.uniform(-quirk_pair_phi_spread, quirk_pair_phi_spread))
+            opening_delta = float(
+                rng.uniform(-quirk_opening_angle_jitter, quirk_opening_angle_jitter)
+            )
             pt_jitter = 1.0 + float(
                 rng.uniform(-quirk_pair_pt_jitter_frac, quirk_pair_pt_jitter_frac)
             )
             pair_pt_i = float(max(1e-4, quirk_pair_pt * pt_jitter))
+            x0_i = float(quirk_x0 + rng.uniform(-quirk_origin_jitter_mm, quirk_origin_jitter_mm))
+            y0_i = float(quirk_y0 + rng.uniform(-quirk_origin_jitter_mm, quirk_origin_jitter_mm))
+            z0_i = float(
+                quirk_z0 + rng.uniform(-0.5 * quirk_origin_jitter_mm, 0.5 * quirk_origin_jitter_mm)
+            )
+            opening_i = float(
+                np.clip(
+                    quirk_opening_angle + opening_delta,
+                    1e-3,
+                    np.pi - 1e-3,
+                )
+            )
 
             pair = simulate_quirk_pair_tracks(
                 event_id=event_id * 100 + pair_idx + 10000 * retry,
@@ -539,11 +623,11 @@ def build_quirk_event(
                 quirk_mass=quirk_mass,
                 pair_pt=pair_pt_i,
                 pair_pz=quirk_pair_pz,
-                opening_angle=quirk_opening_angle,
+                opening_angle=opening_i,
                 phi0=quirk_phi0 + phi_delta,
-                x0=quirk_x0,
-                y0=quirk_y0,
-                z0=quirk_z0,
+                x0=x0_i,
+                y0=y0_i,
+                z0=z0_i,
                 string_tension=quirk_string_tension,
                 oscillation_jitter=quirk_oscillation_jitter,
                 velocity_scale=quirk_velocity_scale,
@@ -593,6 +677,18 @@ def build_quirk_event(
                 break
         else:
             last_quirk_hits = 0
+
+    # If retry loop still cannot build enough quirk intersections, add a deterministic
+    # fallback from module centers to avoid dropping entire events.
+    if (hits.empty or int((hits["source_label"] > 0).sum()) < int(min_total_quirk_hits)):
+        fallback_hits = _fallback_quirk_hits_from_modules(
+            event_id=event_id,
+            module_table=module_table,
+            min_hits_per_track=min_quirk_hits_per_track,
+            pair_pt=quirk_pair_pt,
+        )
+        if len(fallback_hits) > 0:
+            hits = pd.concat([hits, fallback_hits], ignore_index=True, sort=False)
 
     if include_sm_background:
         prefixes = _trackml_event_prefixes(input_dir)
@@ -721,6 +817,8 @@ def prepare_quirk_event(
                         "quirk_pairs_per_event",
                         "quirk_pair_pt_jitter_frac",
                         "quirk_pair_phi_spread",
+                        "quirk_opening_angle_jitter",
+                        "quirk_origin_jitter_mm",
                         "min_quirk_hits_per_track",
                         "min_total_quirk_hits",
                         "quirk_event_max_retries",
