@@ -1,3 +1,6 @@
+# Raw TrackML data (too large for version control)
+trackml_raw/
+
 # Byte-compiled / optimized / DLL files
 *__pycache__*
 *.py[cod]

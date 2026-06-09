@@ -365,6 +365,52 @@ def adaptive_cylindrical_edge_filter(edge_list, batch, hparams):
     return edge_list[:, keep]
 
 
+def build_quirk_coordinate_edges(batch, hparams):
+    """
+    Build edges in physical coordinate space between quirk hits (source_label > 0).
+
+    The KNN graph in embedding space will miss quirk return hits when the model has
+    not yet learned quirk patterns. This pass ensures physically nearby quirk hits
+    are always included as edge candidates, regardless of embedding quality.
+    """
+    if not hasattr(batch, "source_label"):
+        return torch.empty((2, 0), dtype=torch.long)
+
+    src_labels = batch.source_label
+    quirk_idx = torch.where(src_labels > 0)[0]
+
+    if quirk_idx.numel() < 2:
+        return torch.empty((2, 0), dtype=torch.long)
+
+    x = batch.x
+    r_mm = x[quirk_idx, 0] * 1000.0
+    phi = x[quirk_idx, 1] * np.pi
+    z_mm = x[quirk_idx, 2] * 1000.0
+
+    dr_max = float(hparams.get("quirk_coord_dr_mm", 200.0))
+    dphi_max = float(hparams.get("quirk_coord_dphi_mm", 250.0))
+    dz_max = float(hparams.get("quirk_coord_dz_mm", 600.0))
+
+    n_q = len(quirk_idx)
+    dr = torch.abs(r_mm.unsqueeze(0) - r_mm.unsqueeze(1))
+    dphi = torch.abs(phi.unsqueeze(0) - phi.unsqueeze(1))
+    dphi = torch.minimum(dphi, 2.0 * np.pi - dphi)
+    r_bar = 0.5 * (r_mm.unsqueeze(0) + r_mm.unsqueeze(1))
+    d_rphi = r_bar * dphi
+    dz = torch.abs(z_mm.unsqueeze(0) - z_mm.unsqueeze(1))
+
+    eye = torch.eye(n_q, dtype=torch.bool, device=x.device)
+    keep = (dr <= dr_max) & (d_rphi <= dphi_max) & (dz <= dz_max) & (~eye)
+
+    i_idx, j_idx = torch.where(keep)
+    if i_idx.numel() == 0:
+        return torch.empty((2, 0), dtype=torch.long, device=x.device)
+
+    src = quirk_idx[i_idx]
+    dst = quirk_idx[j_idx]
+    return torch.stack([src, dst], dim=0)
+
+
 def build_knn(spatial, k):
 
     if device == "cuda":

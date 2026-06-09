@@ -661,13 +661,21 @@ def build_quirk_event(
             hits_q["q_label"] = "quirk"
             hits_q["source_label"] = np.int64(1)
             hits_q["pt"] = float(max(1e-4, 0.5 * pair_pt_i))
-            hits_q["order_key"] = np.linspace(0.0, 1.0, len(hits_q), dtype=np.float32)
+            # Use trajectory_step (simulator time index) for correct time-ordered edges.
+            # Quirks oscillate back toward origin so distance-from-vertex ordering is wrong.
+            if "trajectory_step" in hits_q.columns:
+                hits_q["order_key"] = hits_q["trajectory_step"].astype(np.float32)
+            else:
+                hits_q["order_key"] = np.arange(len(hits_q), dtype=np.float32)
 
             hits_aq["particle_id"] = pid_aq
             hits_aq["q_label"] = "anti_quirk"
             hits_aq["source_label"] = np.int64(2)
             hits_aq["pt"] = float(max(1e-4, 0.5 * pair_pt_i))
-            hits_aq["order_key"] = np.linspace(0.0, 1.0, len(hits_aq), dtype=np.float32)
+            if "trajectory_step" in hits_aq.columns:
+                hits_aq["order_key"] = hits_aq["trajectory_step"].astype(np.float32)
+            else:
+                hits_aq["order_key"] = np.arange(len(hits_aq), dtype=np.float32)
             quirk_frames.extend([hits_q, hits_aq])
 
         if quirk_frames:

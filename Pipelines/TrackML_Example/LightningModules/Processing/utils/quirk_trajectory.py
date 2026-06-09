@@ -79,7 +79,7 @@ def simulate_quirk_pair_tracks(
     v2 = p2 * inv_mass
 
     # Initialize positions with a small separation in the opening direction.
-    sep0 = min(20.0, 0.02 * _radius_from_pt(pair_pt, charge, b_field))
+    sep0 = min(900.0, max(400.0, 0.15 * _radius_from_pt(pair_pt, charge, b_field)))
     pos1 = np.array([x0, y0, z0], dtype=np.float64) + 0.5 * sep0 * perp_dir
     pos2 = np.array([x0, y0, z0], dtype=np.float64) - 0.5 * sep0 * perp_dir
 

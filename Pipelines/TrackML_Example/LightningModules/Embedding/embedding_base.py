@@ -29,6 +29,7 @@ from .utils import (
     split_datasets,
     build_edges,
     adaptive_cylindrical_edge_filter,
+    build_quirk_coordinate_edges,
 )
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -257,12 +258,33 @@ class EmbeddingBase(LightningModule):
             reduction="mean",
         )
 
-        positive_loss = torch.nn.functional.hinge_embedding_loss(
-            d[hinge == 1],
-            hinge[hinge == 1],
-            margin=self.hparams["margin"]**2,
-            reduction="mean",
-        )
+        # Source-aware positive loss: upweight quirk-to-quirk true pairs so the
+        # ~5% quirk signal receives proportional gradient despite class imbalance.
+        positive_mask = hinge == 1
+        if (
+            positive_mask.sum() > 0
+            and hasattr(batch, "source_label")
+            and batch.source_label.max() > 0
+        ):
+            quirk_w = float(self.hparams.get("quirk_loss_weight", 10.0))
+            src_labels = batch.source_label
+            pos_edges = e_spatial[:, positive_mask]
+            is_quirk_pair = (
+                (src_labels[pos_edges[0]] > 0) & (src_labels[pos_edges[1]] > 0)
+            )
+            pair_weights = torch.ones(positive_mask.sum(), device=self.device)
+            pair_weights[is_quirk_pair] = quirk_w
+            pos_d = d[positive_mask]
+            positive_loss = (pair_weights * pos_d).sum() / pair_weights.sum()
+        elif positive_mask.sum() > 0:
+            positive_loss = torch.nn.functional.hinge_embedding_loss(
+                d[positive_mask],
+                hinge[positive_mask],
+                margin=self.hparams["margin"]**2,
+                reduction="mean",
+            )
+        else:
+            positive_loss = torch.tensor(0.0, device=self.device)
 
         loss = negative_loss + self.hparams["weight"] * positive_loss
 
@@ -293,6 +315,16 @@ class EmbeddingBase(LightningModule):
             spatial, spatial, indices=None, r_max=knn_radius, k_max=knn_num
         )
         e_spatial = adaptive_cylindrical_edge_filter(e_spatial, batch, self.hparams)
+
+        # Add coordinate-space edges for quirk hits so that return hits (Δr≈0)
+        # are always candidate edges even before the embedding learns quirk patterns.
+        if hasattr(batch, "source_label") and batch.source_label.max() > 0:
+            e_quirk = build_quirk_coordinate_edges(batch, self.hparams)
+            if e_quirk.shape[1] > 0:
+                e_spatial = torch.cat(
+                    [e_spatial, e_quirk.to(e_spatial.device)], dim=1
+                )
+                e_spatial = torch.unique(e_spatial, dim=1)
 
         e_spatial, y_cluster = self.get_truth(batch, e_spatial, e_bidir)
 

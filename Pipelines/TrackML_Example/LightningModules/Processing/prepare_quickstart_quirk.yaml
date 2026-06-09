@@ -4,7 +4,7 @@ input_dir: ${EXATRKX_DATA}/train_all
 output_dir: Examples/TrackML_Quickstart/datasets/quickstart_quirk_example
 detector_path: ${EXATRKX_DATA}/detectors.csv
 n_files: 100
-n_workers: 32
+n_workers: 16
 n_tasks: 1
 overwrite: True
 min_pt: 1
@@ -16,32 +16,32 @@ modulewise: True
 cell_information: False
 
 # Quirk generation parameters
-quirk_n_steps: 6000
+quirk_n_steps: 3000
 quirk_t_max: 8.0
 quirk_b_field: 2.0
 quirk_charge: 1.0
 quirk_mass: 1000.0
-quirk_pair_pt: 2.0
-quirk_pair_pz: 0.2
+quirk_pair_pt: 6.0
+quirk_pair_pz: 3.0
 quirk_opening_angle: 1.57079632679
 quirk_phi0: 0.0
 quirk_x0: 0.0
 quirk_y0: 0.0
 quirk_z0: 0.0
-quirk_string_tension: 0.02
+quirk_string_tension: 0.2
 quirk_oscillation_jitter: 0.0
-quirk_velocity_scale: 2000.0
-quirk_tolerance_mm: 260.0
-quirk_max_hits: 96
-quirk_sample_points: 600
-quirk_pairs_per_event: 4
+quirk_velocity_scale: 1200.0
+quirk_tolerance_mm: 1000.0
+quirk_max_hits: 150
+quirk_sample_points: 800
+quirk_pairs_per_event: 8
 quirk_pair_pt_jitter_frac: 0.2
 quirk_pair_phi_spread: 1.2
 quirk_opening_angle_jitter: 0.35
 quirk_origin_jitter_mm: 40.0
 min_quirk_hits_per_track: 2
-min_total_quirk_hits: 6
-quirk_event_max_retries: 15
+min_total_quirk_hits: 20
+quirk_event_max_retries: 3
 
 # SM background mixing
 include_sm_background: True

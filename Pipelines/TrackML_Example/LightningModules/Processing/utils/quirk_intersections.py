@@ -274,6 +274,7 @@ def intersect_track_with_modules(
         rows.append(
             {
                 "hit_id": int(hit_id),
+                "trajectory_step": int(track_i),  # time-ordered step index from simulator
                 "x": float(x),
                 "y": float(y),
                 "z": float(z),
