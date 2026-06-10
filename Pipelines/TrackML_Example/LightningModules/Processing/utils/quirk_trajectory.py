@@ -78,8 +78,12 @@ def simulate_quirk_pair_tracks(
     v1 = p1 * inv_mass
     v2 = p2 * inv_mass
 
-    # Initialize positions with a small separation in the opening direction.
-    sep0 = min(900.0, max(400.0, 0.15 * _radius_from_pt(pair_pt, charge, b_field)))
+    # Quirks are born at the interaction point with a tiny initial separation.
+    # Previously sep0 was 400-900 mm which placed quirks already inside the
+    # strip barrel and gave trajectories that never crossed module planes.
+    # With sep0=2 mm both quirks start near the origin and their velocity
+    # carries them outward through the pixel and strip barrel layers.
+    sep0 = 2.0
     pos1 = np.array([x0, y0, z0], dtype=np.float64) + 0.5 * sep0 * perp_dir
     pos2 = np.array([x0, y0, z0], dtype=np.float64) - 0.5 * sep0 * perp_dir
 

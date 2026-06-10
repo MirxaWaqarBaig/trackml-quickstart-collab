@@ -290,6 +290,9 @@ def intersect_track_with_modules(
     for i in range(n_steps - 1):
         A  = track_xyz[i]
         B  = track_xyz[i + 1]
+        # Skip segments with NaN/inf coordinates (numerical overflow in simulator tail)
+        if not (np.all(np.isfinite(A)) and np.all(np.isfinite(B))):
+            continue
         AB = B - A
         seg_len = float(np.linalg.norm(AB))
         if seg_len < 1e-12:

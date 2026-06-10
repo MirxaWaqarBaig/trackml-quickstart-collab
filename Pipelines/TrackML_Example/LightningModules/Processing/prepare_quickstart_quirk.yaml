@@ -17,7 +17,7 @@ cell_information: False
 
 # Quirk generation parameters
 quirk_n_steps: 3000
-quirk_t_max: 8.0
+quirk_t_max: 20.0
 quirk_b_field: 2.0
 quirk_charge: 1.0
 quirk_mass: 1000.0
@@ -30,7 +30,7 @@ quirk_y0: 0.0
 quirk_z0: 0.0
 quirk_string_tension: 0.2
 quirk_oscillation_jitter: 0.0
-quirk_velocity_scale: 1200.0
+quirk_velocity_scale: 10000.0
 quirk_tolerance_mm: 1000.0
 quirk_max_hits: 150
 quirk_sample_points: 800
