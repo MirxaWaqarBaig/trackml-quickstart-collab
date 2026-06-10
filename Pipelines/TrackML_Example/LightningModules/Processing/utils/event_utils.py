@@ -556,7 +556,7 @@ def build_quirk_event(
     quirk_x0=0.0,
     quirk_y0=0.0,
     quirk_z0=0.0,
-    quirk_string_tension=0.02,
+    quirk_string_tension=1.5,
     quirk_oscillation_jitter=0.0,
     quirk_velocity_scale=1500.0,
     quirk_tolerance_mm=30.0,
@@ -686,17 +686,20 @@ def build_quirk_event(
         else:
             last_quirk_hits = 0
 
-    # If retry loop still cannot build enough quirk intersections, add a deterministic
-    # fallback from module centers to avoid dropping entire events.
-    if (hits.empty or int((hits["source_label"] > 0).sum()) < int(min_total_quirk_hits)):
-        fallback_hits = _fallback_quirk_hits_from_modules(
-            event_id=event_id,
-            module_table=module_table,
-            min_hits_per_track=min_quirk_hits_per_track,
-            pair_pt=quirk_pair_pt,
-        )
-        if len(fallback_hits) > 0:
-            hits = pd.concat([hits, fallback_hits], ignore_index=True, sort=False)
+    # If retry loop still cannot build enough real quirk intersections,
+    # keep the event without fake fallback hits.
+    # FALLBACK DISABLED: injected fake hits from module centers, not real physics.
+    # If real intersections fail, do not invent hits.
+    #
+    # if (hits.empty or int((hits["source_label"] > 0).sum()) < int(min_total_quirk_hits)):
+    #     fallback_hits = _fallback_quirk_hits_from_modules(
+    #         event_id=event_id,
+    #         module_table=module_table,
+    #         min_hits_per_track=min_quirk_hits_per_track,
+    #         pair_pt=quirk_pair_pt,
+    #     )
+    #     if len(fallback_hits) > 0:
+    #         hits = pd.concat([hits, fallback_hits], ignore_index=True, sort=False)
 
     if include_sm_background:
         prefixes = _trackml_event_prefixes(input_dir)
