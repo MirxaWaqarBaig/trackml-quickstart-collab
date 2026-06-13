@@ -593,7 +593,7 @@ def build_quirk_event(
         tol_retry = float(quirk_tolerance_mm) * (1.0 + 0.2 * retry)
 
         for pair_idx in range(quirk_pairs_per_event):
-            pair_phi0 = float(rng.uniform(0.0, 2.0 * np.pi))
+            phi_delta = float(rng.uniform(-quirk_pair_phi_spread, quirk_pair_phi_spread))
             opening_delta = float(
                 rng.uniform(-quirk_opening_angle_jitter, quirk_opening_angle_jitter)
             )
@@ -624,7 +624,7 @@ def build_quirk_event(
                 pair_pt=pair_pt_i,
                 pair_pz=quirk_pair_pz,
                 opening_angle=opening_i,
-                phi0=pair_phi0,
+                phi0=quirk_phi0 + phi_delta,
                 x0=x0_i,
                 y0=y0_i,
                 z0=z0_i,
