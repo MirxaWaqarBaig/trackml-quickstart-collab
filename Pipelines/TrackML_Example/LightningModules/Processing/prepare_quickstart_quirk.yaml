@@ -36,9 +36,9 @@ quirk_velocity_scale: 10000.0
 quirk_tolerance_mm: 1000.0
 quirk_max_hits: 150
 quirk_sample_points: 800
-quirk_pairs_per_event: 4
+quirk_pairs_per_event: 1
 quirk_pair_pt_jitter_frac: 0.2
-quirk_pair_phi_spread: 1.2
+quirk_pair_phi_spread: 3.14159
 quirk_opening_angle_jitter: 0.35
 quirk_origin_jitter_mm: 40.0
 min_quirk_hits_per_track: 2
@@ -47,6 +47,6 @@ quirk_event_max_retries: 3
 
 # SM background mixing
 
-include_sm_background: True
+include_sm_background: False
 sm_background_pt_min: 0.5
-sm_background_max_hits: 1000
+sm_background_max_hits: 0
