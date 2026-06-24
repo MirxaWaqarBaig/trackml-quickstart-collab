@@ -30,7 +30,7 @@ quirk_phi0: 0.0
 quirk_x0: 0.0
 quirk_y0: 0.0
 quirk_z0: 0.0
-quirk_string_tension: 900.0
+quirk_string_tension: 30.0
 quirk_oscillation_jitter: 0.0
 quirk_velocity_scale: 1.0
 quirk_tolerance_mm: 1000.0

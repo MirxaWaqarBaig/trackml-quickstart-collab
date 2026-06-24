@@ -42,11 +42,11 @@ metric_learning_configs:
   weight: 2
   randomisation: 2
   points_per_batch: 100000
-  r_train: 0.01
-  r_val: 0.01
-  r_test: 0.01
-  knn_max_inference: 200 # Reduce Step-2 inference memory pressure (default used previously: 1000)
-  knn: 10
+  r_train: 0.008
+  r_val: 0.008
+  r_test: 0.008
+  knn_max_inference: 100
+  knn: 8
   warmup: 8
   margin: 0.1
   lr: 0.001
@@ -59,7 +59,7 @@ gnn_configs:
   # Dataset parameters
   input_dir: datasets/quickstart_metric_learning_processed
   output_dir: datasets/quickstart_gnn_processed
-  edge_cut: 0.5
+  edge_cut: 0.75
   pt_signal_min: 1.
   pt_background_min: 1.
   datatype_names: [train, val, test] # Which directory prefixes to use, assuming at least a train dataset
@@ -88,14 +88,14 @@ gnn_configs:
   max_epochs: 50
 
 track_building_configs:
-  score_cut: 0.5
+  score_cut: 0.75
   output_dir: datasets/quickstart_track_building_processed
 
 evaluation_configs:
   output_dir: datasets/quickstart_evaluation
   min_pt: 1
   max_eta: 4
-  min_track_length: 3
-  min_particle_length: 3
+  min_track_length: 6
+  min_particle_length: 6
   matching_fraction: 0.5
   matching_style: ATLAS
