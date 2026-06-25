@@ -517,3 +517,185 @@ def compute_before_after_stats(track_xyz, detector_modules,
         "n_outside_boundary":   n_outside,
         "diag_log":             diag_log,
     }
+
+
+# -------------------------------------------------------------------------
+# Hybrid cylinder + real module lookup for cylinder branch
+# -------------------------------------------------------------------------
+
+TRACKML_BARREL_LAYERS = [
+    (8,  2,   32.0,  455.0),
+    (8,  4,   72.0,  455.0),
+    (8,  6,  116.0,  455.0),
+    (8,  8,  172.0,  455.0),
+    (13, 2,  260.0, 1030.0),
+    (13, 4,  360.0, 1030.0),
+    (13, 6,  500.0, 1030.0),
+    (13, 8,  660.0, 1030.0),
+    (17, 2,  820.0, 1030.0),
+    (17, 4, 1020.0, 1030.0),
+]
+
+
+def _build_layer_module_index(detector_modules):
+    """Group real TrackML modules by volume_id and layer_id."""
+    layer_index = {}
+
+    for (volume_id, layer_id), grp in detector_modules.groupby(
+        ["volume_id", "layer_id"], sort=False
+    ):
+        row_idx = grp.index.to_numpy(dtype=np.int64)
+
+        layer_index[(int(volume_id), int(layer_id))] = {
+            "centers": grp[["cx", "cy", "cz"]].to_numpy(dtype=np.float64),
+            "uvec": grp[["ux", "uy", "uz"]].to_numpy(dtype=np.float64),
+            "vvec": grp[["vx", "vy", "vz"]].to_numpy(dtype=np.float64),
+            "half_u": grp["half_u"].to_numpy(dtype=np.float64),
+            "half_v": grp["half_v"].to_numpy(dtype=np.float64),
+            "row_idx": row_idx,
+        }
+
+    return layer_index
+
+
+def intersect_track_with_cylinders_and_modules(
+    track_xyz,
+    detector_modules,
+    barrel_layers=None,
+    tolerance_mm=5.0,
+    max_hits=150,
+    sample_points=None,
+    min_gap_steps=3,
+):
+    """
+    Hybrid cylinder plus real module lookup.
+
+    Stage 1: solve ideal cylinder crossing x^2 + y^2 = R^2.
+    Stage 2: project crossing point into real module local frame.
+    Stage 3: accept only if local_u/local_v are inside module boundary.
+
+    Output schema matches intersect_track_with_modules().
+    """
+
+    track_xyz = np.asarray(track_xyz, dtype=np.float64)
+
+    if len(track_xyz) < 2:
+        return pd.DataFrame()
+
+    if sample_points is not None and sample_points > 0 and len(track_xyz) > sample_points:
+        idx = np.linspace(0, len(track_xyz) - 1, int(sample_points)).astype(int)
+        track_xyz = track_xyz[idx]
+
+    if barrel_layers is None:
+        barrel_layers = TRACKML_BARREL_LAYERS
+
+    layer_index = _build_layer_module_index(detector_modules)
+
+    rows = []
+    last_hit_step = {}
+
+    for i in range(len(track_xyz) - 1):
+        A = track_xyz[i]
+        B = track_xyz[i + 1]
+
+        if not (np.all(np.isfinite(A)) and np.all(np.isfinite(B))):
+            continue
+
+        d = B - A
+        dx, dy, dz = d[0], d[1], d[2]
+
+        a_coeff = dx * dx + dy * dy
+        if a_coeff < 1e-12:
+            continue
+
+        b_half = A[0] * dx + A[1] * dy
+        rA2 = A[0] * A[0] + A[1] * A[1]
+
+        for volume_id, layer_id, radius, z_half in barrel_layers:
+            c_coeff = rA2 - radius * radius
+            disc = b_half * b_half - a_coeff * c_coeff
+
+            if disc < 0.0:
+                continue
+
+            sqrt_disc = np.sqrt(disc)
+
+            for sign in (-1.0, 1.0):
+                t = (-b_half + sign * sqrt_disc) / a_coeff
+
+                if t < 0.0 or t > 1.0:
+                    continue
+
+                x_cross = A[0] + t * dx
+                y_cross = A[1] + t * dy
+                z_cross = A[2] + t * dz
+
+                if abs(z_cross) > z_half:
+                    continue
+
+                layer_key = (int(volume_id), int(layer_id))
+                if layer_key not in layer_index:
+                    continue
+
+                F = np.array([x_cross, y_cross, z_cross], dtype=np.float64)
+
+                layer = layer_index[layer_key]
+                centers = layer["centers"]
+                uvec = layer["uvec"]
+                vvec = layer["vvec"]
+                half_u = layer["half_u"]
+                half_v = layer["half_v"]
+                row_idx = layer["row_idx"]
+
+                dF = F[None, :] - centers
+
+                local_u = np.einsum("ij,ij->i", dF, uvec)
+                local_v = np.einsum("ij,ij->i", dF, vvec)
+
+                inside = (np.abs(local_u) <= half_u) & (np.abs(local_v) <= half_v)
+                candidates = np.where(inside)[0]
+
+                if len(candidates) == 0:
+                    continue
+
+                dist2 = np.sum(dF[candidates] ** 2, axis=1)
+                best_local = candidates[np.argmin(dist2)]
+                global_row = int(row_idx[best_local])
+
+                module = detector_modules.iloc[global_row]
+                module_index = int(module.module_index)
+
+                last_step = last_hit_step.get(module_index, -999999)
+                if i - last_step < min_gap_steps:
+                    continue
+
+                last_hit_step[module_index] = i
+
+                r_cross = float(np.sqrt(x_cross * x_cross + y_cross * y_cross))
+                phi_cross = float(np.arctan2(y_cross, x_cross))
+
+                rows.append(
+                    {
+                        "hit_id": len(rows),
+                        "trajectory_step": int(i),
+                        "x": float(x_cross),
+                        "y": float(y_cross),
+                        "z": float(z_cross),
+                        "r": r_cross,
+                        "phi": phi_cross,
+                        "volume_id": int(module.volume_id),
+                        "layer_id": int(module.layer_id),
+                        "module_id": int(module.module_id),
+                        "module_index": module_index,
+                        "local_u_mm": float(local_u[best_local]),
+                        "local_v_mm": float(local_v[best_local]),
+                        "distance_to_module": 0.0,
+                    }
+                )
+
+                if len(rows) >= max_hits:
+                    return pd.DataFrame(rows)
+
+                break
+
+    return pd.DataFrame(rows) if rows else pd.DataFrame()

@@ -34,6 +34,7 @@ from .quirk_intersections import (
     build_detector_module_table,
     estimate_module_centers_from_hits,
     intersect_track_with_modules,
+    intersect_track_with_cylinders_and_modules,
 )
 
 _MODULE_TABLE_CACHE = {}
@@ -633,14 +634,14 @@ def build_quirk_event(
                 velocity_scale=quirk_velocity_scale,
             )
 
-            hits_q = intersect_track_with_modules(
+            hits_q = intersect_track_with_cylinders_and_modules(
                 pair["xyz_q"],
                 module_table,
                 tolerance_mm=tol_retry,
                 max_hits=quirk_max_hits,
                 sample_points=quirk_sample_points,
             )
-            hits_aq = intersect_track_with_modules(
+            hits_aq = intersect_track_with_cylinders_and_modules(
                 pair["xyz_aq"],
                 module_table,
                 tolerance_mm=tol_retry,
