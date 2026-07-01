@@ -637,16 +637,12 @@ def build_quirk_event(
             hits_q = intersect_track_with_cylinders_and_modules(
                 pair["xyz_q"],
                 module_table,
-                tolerance_mm=tol_retry,
                 max_hits=quirk_max_hits,
-                sample_points=quirk_sample_points,
             )
             hits_aq = intersect_track_with_cylinders_and_modules(
                 pair["xyz_aq"],
                 module_table,
-                tolerance_mm=tol_retry,
                 max_hits=quirk_max_hits,
-                sample_points=quirk_sample_points,
             )
 
             # Enforce per-track minimum for signal quality in mixed events.

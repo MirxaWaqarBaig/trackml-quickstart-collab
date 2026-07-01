@@ -1,0 +1,36 @@
+GNN Edge Filtering Results
+Branch: quirk-module-intersection-cylinder
+Dataset: SM-background mixed quirk dataset
+Total events: 500
+Train/Val/Test split: 400 / 50 / 50
+Test graphs: 50
+Score cut: 0.75
+
+Counts:
+Total candidate edges: 9202
+True edges: 1365
+Wrong edges: 7837
+
+Confusion matrix:
+TP kept true edges: 1320
+FP kept wrong edges: 5836
+FN removed true edges: 45
+TN removed wrong edges: 2001
+
+Metrics:
+Edge efficiency: 96.7%
+Edge purity: 18.4%
+Wrong-edge rejection: 25.5%
+Fake kept rate: 74.5%
+
+Edge-cut scan:
+cut=0.75 | eff=96.7% | pur=18.4% | wrong rejection=25.5% | TP=1320 FP=5836 FN=45 TN=2001
+cut=0.80 | eff=96.0% | pur=18.4% | wrong rejection=25.7% | TP=1310 FP=5821 FN=55 TN=2016
+cut=0.85 | eff=95.5% | pur=18.3% | wrong rejection=25.9% | TP=1303 FP=5811 FN=62 TN=2026
+cut=0.90 | eff=94.7% | pur=18.2% | wrong rejection=26.0% | TP=1292 FP=5801 FN=73 TN=2036
+cut=0.95 | eff=94.4% | pur=18.2% | wrong rejection=26.2% | TP=1288 FP=5786 FN=77 TN=2051
+
+Conclusion:
+The GNN preserves true quirk edges with high efficiency, but fake-edge rejection is weak in the SM-background case.
+The edge-cut scan shows that threshold tuning does not significantly improve purity.
+Next improvement should focus on stricter graph construction or better GNN training.

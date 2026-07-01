@@ -582,10 +582,6 @@ def intersect_track_with_cylinders_and_modules(
     if len(track_xyz) < 2:
         return pd.DataFrame()
 
-    if sample_points is not None and sample_points > 0 and len(track_xyz) > sample_points:
-        idx = np.linspace(0, len(track_xyz) - 1, int(sample_points)).astype(int)
-        track_xyz = track_xyz[idx]
-
     if barrel_layers is None:
         barrel_layers = TRACKML_BARREL_LAYERS
 

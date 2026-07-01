@@ -18,117 +18,167 @@ def _radius_from_pt(pt, charge, b_field):
 
 def simulate_quirk_pair_tracks(
     event_id,
-    n_steps=6000,
-    t_max=8.0,
+    n_steps=70000,
+    t_max=80.0,
     b_field=2.0,
     charge=1.0,
-    quirk_mass=1000.0,
-    pair_pt=5.0,
-    pair_pz=1.0,
-    opening_angle=np.pi / 2.0,
-    phi0=0.0,
+    quirk_mass=500.0,
+    pair_pt=50.0,
+    pair_pz=10.0,
+    opening_angle=1.3,
+    phi0=-0.75,
     x0=0.0, y0=0.0, z0=0.0,
-    string_tension=0.02,
+    string_tension=900.0,
     oscillation_jitter=0.0,
-    velocity_scale=1500.0,
+    velocity_scale=1.0,
 ):
     """
-    Quirk pair simulation using linear (Hookean) string force + RK4.
+    Physical quirk pair simulation using RK4.
 
-    The string force is F = kappa * delta (linear restoring force),
-    which correctly produces oscillating tangled-ribbon trajectories
-    matching the intermediate oscillation regime of Sha et al. 2410.00269.
+    Units:
+        position: mm
+        time: ns
+        mass: GeV/c^2
+        momentum: GeV/c
+        magnetic field: Tesla
+        string_tension: Lambda in eV
 
-    String dominates over Lorentz when:
-        kappa * sep >> charge * v * B * inv_mass
-    Tune string_tension and velocity_scale to achieve this regime.
+    Physical string tension:
+        T = Lambda^2 / (hbar*c)
+
+    This is NOT Hookean kappa*delta.
+    The string force has constant magnitude and acts along the Q anti-Q separation.
+    velocity_scale is kept only for old config compatibility.
     """
-    n_steps        = int(max(200, n_steps))
-    t_max          = float(max(1e-4, t_max))
-    dt             = t_max / (n_steps - 1)
-    charge         = float(charge)
-    b_field        = float(b_field)
-    quirk_mass     = float(max(1e-3, quirk_mass))
-    pair_pt        = float(max(1e-4, pair_pt))
-    pair_pz        = float(pair_pz)
-    opening_angle  = float(np.clip(opening_angle, 1e-3, np.pi - 1e-3))
-    string_tension = float(max(0.0, string_tension))
-    inv_mass       = float(max(1e-6, velocity_scale)) / quirk_mass
 
-    # Initial momenta: COM drift + opposite transverse kicks
-    p_com    = np.array([pair_pt*np.cos(phi0),
-                         pair_pt*np.sin(phi0),
-                         pair_pz], dtype=np.float64)
-    perp_dir = np.array([-np.sin(phi0), np.cos(phi0), 0.0],
-                        dtype=np.float64)
-    rel_mag  = 0.5 * pair_pt * np.tan(0.5 * opening_angle)
-    p_rel    = rel_mag * perp_dir
+    n_steps = int(max(200, n_steps))
+    t_max = float(max(1e-4, t_max))
+    dt = t_max / (n_steps - 1)
 
-    p1 = 0.5 * p_com + p_rel
-    p2 = 0.5 * p_com - p_rel
+    charge = float(charge)
+    b_field = float(b_field)
+    quirk_mass = float(max(1e-6, quirk_mass))
+    pair_pt = float(max(1e-6, pair_pt))
+    pair_pz = float(pair_pz)
+    opening_angle = float(np.clip(opening_angle, 1e-3, np.pi - 1e-3))
 
-    sep0   = 2.0  # mm
-    pos1_0 = np.array([x0, y0, z0], dtype=np.float64) + 0.5*sep0*perp_dir
-    pos2_0 = np.array([x0, y0, z0], dtype=np.float64) - 0.5*sep0*perp_dir
-    v1_0   = p1 * inv_mass
-    v2_0   = p2 * inv_mass
+    # Constants
+    c_mm_ns = 299.792458
+    hbar_c_gev_mm = 197.3269804e-12
+
+    # Convert Lambda from eV to GeV
+    Lambda_eV = float(max(0.0, string_tension))
+    Lambda_GeV = Lambda_eV * 1e-9
+
+    # T = Lambda^2 / (hbar*c), GeV/mm
+    T_gev_mm = (Lambda_GeV ** 2) / hbar_c_gev_mm
+
+    # Convert force to momentum change per ns
+    T_gev_ns = T_gev_mm * c_mm_ns
+
+    # Initial COM momentum
+    p_com = np.array(
+        [
+            pair_pt * np.cos(phi0),
+            pair_pt * np.sin(phi0),
+            pair_pz,
+        ],
+        dtype=np.float64,
+    )
+
+    # Relative transverse direction
+    perp_dir = np.array(
+        [-np.sin(phi0), np.cos(phi0), 0.0],
+        dtype=np.float64,
+    )
+
+    rel_mag = 0.5 * pair_pt * np.tan(0.5 * opening_angle)
+    p_rel = rel_mag * perp_dir
+
+    if oscillation_jitter and oscillation_jitter > 0.0:
+        rng = np.random.default_rng(int(event_id))
+        p_rel = p_rel * (1.0 + float(oscillation_jitter) * rng.normal())
+
+    p1_0 = 0.5 * p_com + p_rel
+    p2_0 = 0.5 * p_com - p_rel
+
+    sep0 = 2.0  # mm
+    r1_0 = np.array([x0, y0, z0], dtype=np.float64) + 0.5 * sep0 * perp_dir
+    r2_0 = np.array([x0, y0, z0], dtype=np.float64) - 0.5 * sep0 * perp_dir
 
     b_vec = np.array([0.0, 0.0, b_field], dtype=np.float64)
 
+    def velocity_from_p(p):
+        energy = np.sqrt(quirk_mass * quirk_mass + np.dot(p, p))
+        return c_mm_ns * p / (energy + 1e-12)
+
     def derivatives(state):
-        r1 = state[0:3];  u1 = state[3:6]
-        r2 = state[6:9];  u2 = state[9:12]
+        r1 = state[0:3]
+        p1 = state[3:6]
+        r2 = state[6:9]
+        p2 = state[9:12]
 
-        # Lorentz force (opposite charges)
-        a1_lor = (+charge) * np.cross(u1, b_vec) * inv_mass
-        a2_lor = (-charge) * np.cross(u2, b_vec) * inv_mass
+        v1 = velocity_from_p(p1)
+        v2 = velocity_from_p(p2)
 
-        # Linear string force: F = kappa * (r_other - r_self)
-        # This is the Hookean restoring force used in Sha et al. Colab sim.
-        # Produces oscillation when string_tension >> Lorentz bending.
-        delta  = r2 - r1
-        a1_str = string_tension * delta * inv_mass
-        a2_str = -string_tension * delta * inv_mass
+        # Lorentz dp/dt term
+        # q v x B with standard HEP conversion factor.
+        dpdt1_lor = 0.000299792458 * (+charge) * np.cross(v1, b_vec)
+        dpdt2_lor = 0.000299792458 * (-charge) * np.cross(v2, b_vec)
 
-        return np.concatenate([u1, a1_lor+a1_str, u2, a2_lor+a2_str])
+        # Constant string tension along separation direction
+        delta = r2 - r1
+        sep = np.linalg.norm(delta) + 1e-12
+        string_hat = delta / sep
 
-    # RK4 integration
-    state = np.concatenate([pos1_0, v1_0, pos2_0, v2_0])
+        dpdt1_str = +T_gev_ns * string_hat
+        dpdt2_str = -T_gev_ns * string_hat
+
+        return np.concatenate(
+            [
+                v1,
+                dpdt1_lor + dpdt1_str,
+                v2,
+                dpdt2_lor + dpdt2_str,
+            ]
+        )
+
+    state = np.concatenate([r1_0, p1_0, r2_0, p2_0])
 
     xyz1 = np.zeros((n_steps, 3), dtype=np.float64)
     xyz2 = np.zeros((n_steps, 3), dtype=np.float64)
-    vel1 = np.zeros((n_steps, 3), dtype=np.float64)
-    vel2 = np.zeros((n_steps, 3), dtype=np.float64)
+    pxyz1 = np.zeros((n_steps, 3), dtype=np.float64)
+    pxyz2 = np.zeros((n_steps, 3), dtype=np.float64)
 
     for i in range(n_steps):
-        xyz1[i] = state[0:3];  vel1[i] = state[3:6]
-        xyz2[i] = state[6:9];  vel2[i] = state[9:12]
+        xyz1[i] = state[0:3]
+        pxyz1[i] = state[3:6]
+        xyz2[i] = state[6:9]
+        pxyz2[i] = state[9:12]
 
         if not np.all(np.isfinite(state)):
-            xyz1[i:] = xyz1[max(0, i-1)]
-            xyz2[i:] = xyz2[max(0, i-1)]
-            vel1[i:] = vel1[max(0, i-1)]
-            vel2[i:] = vel2[max(0, i-1)]
+            xyz1[i:] = xyz1[max(0, i - 1)]
+            xyz2[i:] = xyz2[max(0, i - 1)]
+            pxyz1[i:] = pxyz1[max(0, i - 1)]
+            pxyz2[i:] = pxyz2[max(0, i - 1)]
             break
 
         k1 = derivatives(state)
-        k2 = derivatives(state + 0.5*dt*k1)
-        k3 = derivatives(state + 0.5*dt*k2)
-        k4 = derivatives(state + dt*k3)
-        state = state + (dt/6.0)*(k1 + 2.0*k2 + 2.0*k3 + k4)
+        k2 = derivatives(state + 0.5 * dt * k1)
+        k3 = derivatives(state + 0.5 * dt * k2)
+        k4 = derivatives(state + dt * k3)
 
-    pxyz1 = (vel1 * quirk_mass).astype(np.float32)
-    pxyz2 = (vel2 * quirk_mass).astype(np.float32)
+        state = state + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
 
     return {
         "event_id": int(event_id),
-        "xyz_q":    xyz1.astype(np.float32),
-        "xyz_aq":   xyz2.astype(np.float32),
-        "pxyz_q":   pxyz1,
-        "pxyz_aq":  pxyz2,
-        "q_q":      np.float32(charge),
-        "q_aq":     np.float32(-charge),
-        "time":     np.linspace(0.0, t_max, n_steps, dtype=np.float32),
+        "xyz_q": xyz1.astype(np.float32),
+        "xyz_aq": xyz2.astype(np.float32),
+        "pxyz_q": pxyz1.astype(np.float32),
+        "pxyz_aq": pxyz2.astype(np.float32),
+        "q_q": np.float32(charge),
+        "q_aq": np.float32(-charge),
+        "time": np.linspace(0.0, t_max, n_steps, dtype=np.float32),
     }
 
 
