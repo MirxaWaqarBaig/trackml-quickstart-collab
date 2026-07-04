@@ -26,15 +26,33 @@ def parse_args():
 def load_reconstruction_df(file):
     """Load the reconstructed tracks from a file."""
     graph = torch.load(file, map_location="cpu", weights_only=False)
-    reconstruction_df = pd.DataFrame({"hit_id": graph.hid, "track_id": graph.labels, "particle_id": graph.pid})
+
+    source = getattr(graph, "source_label", None)
+    if source is None:
+        source = np.zeros_like(graph.pid)
+
+    reconstruction_df = pd.DataFrame({
+        "hit_id": graph.hid,
+        "track_id": graph.labels,
+        "particle_id": graph.pid,
+        "source": source,   # 0=SM, 1=quirk, 2=anti-quirk
+    })
     return reconstruction_df
 
 def load_particles_df(file):
     """Load the particles from a file."""
     graph = torch.load(file, map_location="cpu", weights_only=False)
 
+    source = getattr(graph, "source_label", None)
+    if source is None:
+        source = np.zeros_like(graph.pid)
+
     # Get the particle dataframe
-    particles_df = pd.DataFrame({"particle_id": graph.pid, "pt": graph.pt})
+    particles_df = pd.DataFrame({
+        "particle_id": graph.pid,
+        "pt": graph.pt,
+        "source": source,   # 0=SM, 1=quirk, 2=anti-quirk
+    })
 
     # Reduce to only unique particle_ids
     particles_df = particles_df.drop_duplicates(subset=['particle_id'])
@@ -167,6 +185,55 @@ def evaluate(config_file="pipeline_config.yaml"):
     logging.info(f"Efficiency: {eff:.3f}")
     logging.info(f"Fake rate: {fake_rate:.3f}")
     logging.info(f"Duplication rate: {dup_rate:.3f}")
+
+    # ============================================================
+    # Source-split metrics
+    # source: 0 = SM background, 1 = quirk, 2 = anti-quirk
+    # ============================================================
+
+    quirk_particles = particles[particles["source"] > 0]
+    sm_particles = particles[particles["source"] == 0]
+
+    reconstructed_quirk_particles = reconstructed_particles[reconstructed_particles["source"] > 0]
+    reconstructed_sm_particles = reconstructed_particles[reconstructed_particles["source"] == 0]
+
+    n_quirk_particles = len(
+        quirk_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+    n_reconstructed_quirk_particles = len(
+        reconstructed_quirk_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+
+    n_sm_particles = len(
+        sm_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+    n_reconstructed_sm_particles = len(
+        reconstructed_sm_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+
+    quirk_eff = (
+        n_reconstructed_quirk_particles / n_quirk_particles
+        if n_quirk_particles > 0 else 0.0
+    )
+    sm_eff = (
+        n_reconstructed_sm_particles / n_sm_particles
+        if n_sm_particles > 0 else 0.0
+    )
+
+    logging.info(headline("Source-split reconstruction metrics"))
+    logging.info(f"Number of quirk particles: {n_quirk_particles}")
+    logging.info(f"Number of reconstructed quirk particles: {n_reconstructed_quirk_particles}")
+    logging.info(f"Quirk-only efficiency: {quirk_eff:.3f}")
+
+    logging.info(f"Number of SM particles: {n_sm_particles}")
+    logging.info(f"Number of reconstructed SM particles: {n_reconstructed_sm_particles}")
+    logging.info(f"SM-only efficiency: {sm_eff:.3f}")
+
+    logging.info(
+        f"Reconstructed split check: quirk {n_reconstructed_quirk_particles} + "
+        f"SM {n_reconstructed_sm_particles} = "
+        f"{n_reconstructed_quirk_particles + n_reconstructed_sm_particles}"
+    )
 
     logging.info(headline("c) Plotting results"))
 

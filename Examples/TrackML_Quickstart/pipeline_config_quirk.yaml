@@ -42,18 +42,18 @@ metric_learning_configs:
   weight: 2
   randomisation: 2
   points_per_batch: 100000
-  r_train: 0.008
-  r_val: 0.008
-  r_test: 0.008
-  knn_max_inference: 100
-  knn: 8
+  r_train: 0.1
+  r_val: 0.1
+  r_test: 0.009
+  knn_max_inference: 120
+  knn: 10
   warmup: 8
   margin: 0.1
   lr: 0.001
   factor: 0.85
   patience: 8
   regime: [rp, hnm, norm]
-  max_epochs: 60
+  max_epochs: 50
 
 gnn_configs:
   # Dataset parameters
@@ -85,7 +85,7 @@ gnn_configs:
   truth_key: pid_signal
   regime: [pid]
   mask_background: True
-  max_epochs: 50
+  max_epochs: 30
 
 track_building_configs:
   score_cut: 0.75
@@ -93,7 +93,7 @@ track_building_configs:
 
 evaluation_configs:
   output_dir: datasets/quickstart_evaluation
-  min_pt: 1
+  min_pt: 5
   max_eta: 4
   min_track_length: 6
   min_particle_length: 6

@@ -22,7 +22,7 @@ quirk_n_steps: 70000
 quirk_t_max: 80.0
 quirk_b_field: 2.0
 quirk_charge: 1.0
-quirk_mass: 500.0
+quirk_mass: 700.0
 quirk_pair_pt: 50.0
 quirk_pair_pz: 10.0
 quirk_opening_angle: 1.2
@@ -30,7 +30,7 @@ quirk_phi0: 0.0
 quirk_x0: 0.0
 quirk_y0: 0.0
 quirk_z0: 0.0
-quirk_string_tension: 30.0
+quirk_string_tension: 20.0
 quirk_oscillation_jitter: 0.0
 quirk_velocity_scale: 1.0
 quirk_tolerance_mm: 1000.0
