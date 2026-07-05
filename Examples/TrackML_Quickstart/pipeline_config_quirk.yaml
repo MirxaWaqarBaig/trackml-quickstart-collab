@@ -10,7 +10,7 @@ metric_learning_configs:
   output_dir: datasets/quickstart_metric_learning_processed
   pt_signal_cut: 5.
   pt_background_cut: 5.
-  train_split: [400, 50, 50] # Number of [training, validation, testing] examples
+  train_split: [80, 10, 10] # Number of [training, validation, testing] examples
   true_edges: modulewise_true_edges
   quirky_transform: False # Keep disabled for physics-driven pair trajectory mode
   quirky_amplitude: 0.003 # Used only if quirky_transform=True
@@ -63,7 +63,7 @@ gnn_configs:
   pt_signal_min: 5.
   pt_background_min: 5.
   datatype_names: [train, val, test] # Which directory prefixes to use, assuming at least a train dataset
-  datatype_split: [400, 50, 50] # Number of [training, validation, testing] examples
+  datatype_split: [80, 10, 10] # Number of [training, validation, testing] examples
   noise: False
 
   # Model parameters

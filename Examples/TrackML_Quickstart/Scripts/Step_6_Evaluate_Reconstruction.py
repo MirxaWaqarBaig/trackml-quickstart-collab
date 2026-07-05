@@ -24,20 +24,41 @@ def parse_args():
     return parser.parse_args()
 
 def load_reconstruction_df(file):
-    """Load the reconstructed tracks from a file."""
     graph = torch.load(file, map_location="cpu", weights_only=False)
-    reconstruction_df = pd.DataFrame({"hit_id": graph.hid, "track_id": graph.labels, "particle_id": graph.pid})
+
+    def to_numpy(x):
+        return x.cpu().numpy() if hasattr(x, "cpu") else x
+
+    reconstruction_df = pd.DataFrame({
+        "hit_id": to_numpy(graph.hid),
+        "track_id": to_numpy(graph.labels),
+        "particle_id": to_numpy(graph.pid),
+        "source": to_numpy(graph.source_label),  # 0=SM, 1=quirk, 2=anti-quirk
+    })
+
     return reconstruction_df
 
 def load_particles_df(file):
-    """Load the particles from a file."""
+    """Load the particles from a file, including source label."""
     graph = torch.load(file, map_location="cpu", weights_only=False)
 
-    # Get the particle dataframe
-    particles_df = pd.DataFrame({"particle_id": graph.pid, "pt": graph.pt})
+    def to_numpy(x):
+        return x.cpu().numpy() if hasattr(x, "cpu") else x
 
-    # Reduce to only unique particle_ids
-    particles_df = particles_df.drop_duplicates(subset=['particle_id'])
+    hit_particle_df = pd.DataFrame({
+        "particle_id": to_numpy(graph.pid),
+        "pt": to_numpy(graph.pt),
+        "source": to_numpy(graph.source_label),  # 0=SM, 1=quirk, 2=anti-quirk
+    })
+
+    particles_df = (
+        hit_particle_df
+        .groupby("particle_id", as_index=False)
+        .agg({
+            "pt": "first",
+            "source": lambda x: int(pd.Series(x).mode().iloc[0])
+        })
+    )
 
     return particles_df
 
@@ -155,6 +176,40 @@ def evaluate(config_file="pipeline_config.yaml"):
     logging.info(headline("b) Calculating the performance metrics"))
     logging.info(f"Number of reconstructed particles: {n_reconstructed_particles}")
     logging.info(f"Number of particles: {n_particles}")
+
+    # Source-separated reconstruction summary
+    particle_unique = particles.drop_duplicates(subset=['event_id', 'particle_id'])
+    reco_unique = reconstructed_particles.drop_duplicates(subset=['event_id', 'particle_id'])
+
+    q_particles = particle_unique[particle_unique["source"] == 1]
+    aq_particles = particle_unique[particle_unique["source"] == 2]
+    sm_particles = particle_unique[particle_unique["source"] == 0]
+    signal_particles = particle_unique[particle_unique["source"].isin([1, 2])]
+
+    q_reco = reco_unique[reco_unique["source"] == 1]
+    aq_reco = reco_unique[reco_unique["source"] == 2]
+    sm_reco = reco_unique[reco_unique["source"] == 0]
+    signal_reco = reco_unique[reco_unique["source"].isin([1, 2])]
+
+    def safe_eff(num, den):
+        return num / den if den > 0 else 0.0
+
+    logging.info("===== Source-separated reconstruction =====")
+    logging.info(f"Quirk particles: {len(q_particles)}")
+    logging.info(f"Reconstructed quirk particles: {len(q_reco)}")
+    logging.info(f"Quirk efficiency: {safe_eff(len(q_reco), len(q_particles)):.3f}")
+
+    logging.info(f"Anti-quirk particles: {len(aq_particles)}")
+    logging.info(f"Reconstructed anti-quirk particles: {len(aq_reco)}")
+    logging.info(f"Anti-quirk efficiency: {safe_eff(len(aq_reco), len(aq_particles)):.3f}")
+
+    logging.info(f"Signal particles quirk plus anti-quirk: {len(signal_particles)}")
+    logging.info(f"Reconstructed signal particles: {len(signal_reco)}")
+    logging.info(f"Signal efficiency: {safe_eff(len(signal_reco), len(signal_particles)):.3f}")
+
+    logging.info(f"SM particles: {len(sm_particles)}")
+    logging.info(f"Reconstructed SM particles: {len(sm_reco)}")
+    logging.info(f"SM reconstruction rate: {safe_eff(len(sm_reco), len(sm_particles)):.3f}")
     logging.info(f"Number of matched tracks: {n_matched_tracks}")
     logging.info(f"Number of tracks: {n_tracks}")
     logging.info(f"Number of duplicate reconstructed particles: {n_dup_reconstructed_particles}")   

@@ -4,7 +4,7 @@ input_dir: ${EXATRKX_DATA}/train_all
 output_dir: Examples/TrackML_Quickstart/datasets/quickstart_quirk_example
 detector_path: ${EXATRKX_DATA}/detectors.csv
 
-n_files: 500
+n_files: 100
 n_workers: 16
 n_tasks: 1
 overwrite: True
