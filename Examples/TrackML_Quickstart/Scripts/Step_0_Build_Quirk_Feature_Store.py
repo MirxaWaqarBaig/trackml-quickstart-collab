@@ -59,7 +59,15 @@ def main():
         hparams = yaml.load(handle, Loader=yaml.FullLoader)
 
     # Force output into this quickstart copy so notebook can consume directly.
-    hparams["output_dir"] = str(quickstart_dir / "datasets" / "quickstart_quirk_example")
+    # Respect output_dir from the quirk preparation config.
+    # If it is relative, resolve it from the repository root.
+    configured_output_dir = hparams.get("output_dir", quickstart_dir / "datasets" / "quickstart_quirk_example")
+    configured_output_dir = Path(configured_output_dir)
+
+    if not configured_output_dir.is_absolute():
+        configured_output_dir = repo_root / configured_output_dir
+
+    hparams["output_dir"] = str(configured_output_dir)
     if args.n_files is not None:
         hparams["n_files"] = int(args.n_files)
     if args.detector_path is not None:
