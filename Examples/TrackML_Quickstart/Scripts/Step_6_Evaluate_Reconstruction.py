@@ -225,10 +225,21 @@ def evaluate(config_file="pipeline_config.yaml"):
 
     logging.info(headline("c) Plotting results"))
 
-    # First get the list of particles without duplicates
-    grouped_reco_particles = particles.groupby('particle_id')["is_reconstructed"].any()
-    particles["is_reconstructed"] = particles["particle_id"].isin(grouped_reco_particles[grouped_reco_particles].index.values)
-    particles = particles.drop_duplicates(subset=['particle_id'])
+    # First get the list of particles without duplicates.
+    # Use event_id + particle_id because particle IDs can repeat across events.
+    grouped_reco_particles = (
+        particles.groupby(["event_id", "particle_id"])["is_reconstructed"]
+        .any()
+        .reset_index()
+    )
+
+    particles = particles.drop(columns=["is_reconstructed"]).merge(
+        grouped_reco_particles,
+        on=["event_id", "particle_id"],
+        how="left"
+    )
+
+    particles = particles.drop_duplicates(subset=["event_id", "particle_id"])
 
     # Plot the results across pT and eta
     plot_pt_eff(particles)
