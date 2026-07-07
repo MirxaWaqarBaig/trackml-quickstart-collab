@@ -1,0 +1,34 @@
+Two-configuration quirk generalization dataset setup
+
+Training Dataset A:
+mQ = 500 GeV
+Lambda = 900 eV
+pair_pt = 50 GeV
+events = 100
+folder = Examples/TrackML_Quickstart/datasets/quirk_500_900_pt50
+
+Training Dataset B:
+mQ = 1000 GeV
+Lambda = 700 eV
+pair_pt = 80 GeV
+events = 100
+folder = Examples/TrackML_Quickstart/datasets/quirk_1000_700_pt80
+
+Reason for Dataset B pair_pt=80:
+At pair_pt=50, Dataset B showed real Q-AQ oscillation, but detector coverage was weak.
+Increasing pair_pt improves layer/hit coverage while keeping the oscillatory quirk behavior.
+
+Mixed training dataset:
+A + B = 200 events
+folder = Examples/TrackML_Quickstart/datasets/quirk_train_AB_500_900_pt50__1000_700_pt80
+split = [160, 20, 20]
+
+Unseen test Dataset C:
+mQ = 700 GeV
+Lambda = 1100 eV
+pair_pt = 50 GeV
+events = 100
+folder = Examples/TrackML_Quickstart/datasets/quirk_test_700_1100_pt50
+
+Generalization test:
+Train on A+B, then evaluate separately on unseen C.

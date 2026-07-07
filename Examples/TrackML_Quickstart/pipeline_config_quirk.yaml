@@ -57,7 +57,7 @@ metric_learning_configs:
 
 gnn_configs:
   # Dataset parameters
-  input_dir: datasets/quirk_train_AB_500_900_pt50__1000_700_pt80
+  input_dir: datasets/quickstart_metric_learning_processed
   output_dir: datasets/quickstart_gnn_processed
   edge_cut: 0.75
   pt_signal_min: 5.
