@@ -1,0 +1,32 @@
+Step 6 reconstruction result
+
+Total evaluated events: 100
+
+Overall:
+Number of reconstructed particles: 180
+Number of particles: 4338
+Overall efficiency including SM background: 0.041
+Fake rate: 0.058
+Duplication rate: 0.000
+
+Source-separated signal result:
+Quirk particles: 100
+Reconstructed quirk particles: 90
+Quirk efficiency: 0.900
+
+Anti-quirk particles: 100
+Reconstructed anti-quirk particles: 90
+Anti-quirk efficiency: 0.900
+
+Signal particles quirk plus anti-quirk: 200
+Reconstructed signal particles: 180
+Signal efficiency: 0.900
+
+SM particles: 4138
+Reconstructed SM particles: 0
+SM reconstruction rate: 0.000
+
+Interpretation:
+The total efficiency is low because the denominator includes SM background particles.
+The relevant signal reconstruction efficiency is 90.0%.
+The model reconstructs quirk and anti-quirk signal tracks with high efficiency while rejecting SM background.
