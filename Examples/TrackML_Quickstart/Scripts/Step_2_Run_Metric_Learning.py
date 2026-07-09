@@ -38,6 +38,13 @@ def train(config_file="pipeline_config.yaml"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = LayerlessEmbedding.load_from_checkpoint(os.path.join(common_configs["artifact_directory"], "metric_learning", common_configs["experiment_name"]+".ckpt")).to(device)
 
+    # Important for unseen/generalization runs:
+    # checkpoint contains old training hparams, so force current config paths/splits.
+    for k, v in common_configs.items():
+        setattr(model.hparams, k, v)
+    for k, v in metric_learning_configs.items():
+        setattr(model.hparams, k, v)
+
     logging.info(headline("b) Running inferencing"))
     if common_configs["clear_directories"]:
         delete_directory(metric_learning_configs["output_dir"])

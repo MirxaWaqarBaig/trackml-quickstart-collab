@@ -41,6 +41,13 @@ def train(config_file="pipeline_config.yaml"):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = InteractionGNN.load_from_checkpoint(os.path.join(common_configs["artifact_directory"], "gnn", common_configs["experiment_name"]+".ckpt")).to(device)
+
+    # Important for unseen/generalization runs:
+    # checkpoint contains old training hparams, so force current config paths/splits.
+    for k, v in common_configs.items():
+        setattr(model.hparams, k, v)
+    for k, v in gnn_configs.items():
+        setattr(model.hparams, k, v)
     model.setup_data()
 
     logging.info(headline( "b) Running inferencing" ))

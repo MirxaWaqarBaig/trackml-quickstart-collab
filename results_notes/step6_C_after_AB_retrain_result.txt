@@ -1,0 +1,57 @@
+Step 6 Unseen C Result After AB Retraining
+Branch: module-intersection-cylinder-all-masses
+
+Training dataset:
+A+B only
+
+Dataset A:
+mQ = 500 GeV
+Lambda = 900 eV
+pair_pt = 50 GeV
+events = 100
+
+Dataset B:
+mQ = 1000 GeV
+Lambda = 700 eV
+pair_pt = 80 GeV
+events = 100
+
+Unseen test dataset C:
+mQ = 700 GeV
+Lambda = 1100 eV
+pair_pt = 50 GeV
+events = 100
+
+C was evaluated using AB-trained checkpoints.
+C training steps were not run.
+
+Result:
+Number of reconstructed particles: 82
+Number of particles: 4338
+
+Quirk particles: 100
+Reconstructed quirk particles: 26
+Quirk efficiency: 0.260
+
+Anti-quirk particles: 100
+Reconstructed anti-quirk particles: 56
+Anti-quirk efficiency: 0.560
+
+Signal particles quirk plus anti-quirk: 200
+Reconstructed signal particles: 82
+Signal efficiency: 0.410
+
+SM particles: 4138
+Reconstructed SM particles: 0
+SM reconstruction rate: 0.000
+
+Number of matched tracks: 85
+Number of tracks: 126
+Number of duplicate reconstructed particles: 3
+
+Overall efficiency: 0.019
+Fake rate: 0.325
+Duplication rate: 0.037
+
+Interpretation:
+AB-trained model reconstructs the unseen C signal partially, but generalization is weak compared with AB internal performance.
