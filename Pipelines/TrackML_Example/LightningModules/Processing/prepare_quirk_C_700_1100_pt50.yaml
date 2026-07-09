@@ -1,0 +1,63 @@
+# Input/output configuration
+dataset_mode: quirk
+input_dir: /home/rafia/trackml_raw/train_all
+output_dir: Examples/TrackML_Quickstart/datasets/quirk_test_700_1100_pt50
+detector_path: /home/rafia/trackml_raw/detectors.csv
+
+n_files: 100
+n_workers: 16
+n_tasks: 1
+overwrite: True
+min_pt: 5
+
+endcaps: True
+noise: False
+layerwise: True
+modulewise: True
+cell_information: False
+
+# Physical quirk simulator parameters
+# position = mm
+# time = ns
+# mass = GeV/c^2
+# momentum = GeV/c
+# quirk_string_tension = Lambda in eV
+
+quirk_n_steps: 70000
+quirk_t_max: 80.0
+quirk_b_field: 2.0
+quirk_charge: 1.0
+
+quirk_mass: 700.0
+
+quirk_pair_pt: 50.0
+quirk_pair_pz: 10.0
+quirk_opening_angle: 1.3
+quirk_phi0: -0.75
+
+quirk_x0: 0.0
+quirk_y0: 0.0
+quirk_z0: 0.0
+
+quirk_string_tension: 1100.0
+quirk_oscillation_jitter: 0.0
+quirk_velocity_scale: 1.0
+
+# Cylinder + real module lookup
+quirk_tolerance_mm: 1000.0
+quirk_max_hits: 200
+quirk_sample_points: 2000
+
+quirk_pairs_per_event: 1
+quirk_pair_pt_jitter_frac: 0.05
+quirk_pair_phi_spread: 3.14159
+quirk_opening_angle_jitter: 0.10
+quirk_origin_jitter_mm: 2.0
+
+min_quirk_hits_per_track: 4
+min_total_quirk_hits: 8
+quirk_event_max_retries: 30
+
+include_sm_background: True
+sm_background_pt_min: 0.5
+sm_background_max_hits: 500
