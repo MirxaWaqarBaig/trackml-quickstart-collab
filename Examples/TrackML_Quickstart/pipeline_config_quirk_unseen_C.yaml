@@ -1,0 +1,101 @@
+common_configs:
+  experiment_name: trackml_quickstart_quirk
+  artifact_directory: artifacts
+  gpus: 1
+  clear_directories: True
+
+metric_learning_configs:
+  # Dataset parameters
+  input_dir: datasets/quirk_test_700_1100_pt50
+  output_dir: datasets/quickstart_metric_learning_processed_C
+  pt_signal_cut: 5.
+  pt_background_cut: 5.
+  train_split: [0, 0, 100]
+  true_edges: modulewise_true_edges
+  quirky_transform: False # Keep disabled for physics-driven pair trajectory mode
+  quirky_amplitude: 0.003 # Used only if quirky_transform=True
+  quirky_frequency: 4.0 # Used only if quirky_transform=True
+  quirky_mode: phi_only # Used only if quirky_transform=True (phi_only, phi_and_r)
+
+  # Adaptive edge filtering in cylindrical coordinates
+  adaptive_edge_filter: True
+  adaptive_dr_mm: 180.0
+  adaptive_dphi_mm: 180.0
+  adaptive_dz_mm: 260.0
+  adaptive_pt_coeff: 120.0
+
+  # Quirk-specific edge building: coordinate-space pass for return hits (Problem 2 fix)
+  quirk_coord_dr_mm: 200.0
+  quirk_coord_dphi_mm: 250.0
+  quirk_coord_dz_mm: 600.0
+
+  # Source-aware contrastive loss: upweight quirk-to-quirk pairs (Problem 3 fix)
+  quirk_loss_weight: 10.0
+
+  # Model parameters
+  spatial_channels: 3
+  cell_channels: 0
+  emb_hidden: 1024
+  nb_layer: 4
+  emb_dim: 12
+  activation: Tanh
+  weight: 2
+  randomisation: 2
+  points_per_batch: 100000
+  r_train: 0.1
+  r_val: 0.1
+  r_test: 0.009
+  knn_max_inference: 120
+  knn: 10
+  warmup: 8
+  margin: 0.1
+  lr: 0.001
+  factor: 0.85
+  patience: 8
+  regime: [rp, hnm, norm]
+  max_epochs: 50
+
+gnn_configs:
+  # Dataset parameters
+  input_dir: datasets/quickstart_metric_learning_processed_C
+  output_dir: datasets/quickstart_gnn_processed_C
+  edge_cut: 0.75
+  pt_signal_min: 5.
+  pt_background_min: 5.
+  datatype_names: [train, val, test] # Which directory prefixes to use, assuming at least a train dataset
+  datatype_split: [0, 0, 100]
+  noise: False
+
+  # Model parameters
+  spatial_channels: 3
+  cell_channels: 0
+  hidden: 96
+  n_graph_iters: 4
+  nb_node_layer: 2
+  nb_edge_layer: 2
+  precision: 16
+  layernorm: True
+  aggregation: sum_max
+  hidden_activation: SiLU
+  weight: 2
+  warmup: 10
+  lr: 0.002
+  factor: 0.7
+  patience: 8
+  truth_key: pid_signal
+  regime: [pid]
+  mask_background: True
+  max_epochs: 30
+
+track_building_configs:
+  score_cut: 0.75
+  output_dir: datasets/quickstart_track_building_processed_C
+
+evaluation_configs:
+  output_dir: datasets/quickstart_evaluation_C
+  min_pt: 5
+  max_eta: 4
+  min_track_length: 6
+  min_particle_length: 6
+  matching_fraction: 0.5
+  matching_style: ATLAS
