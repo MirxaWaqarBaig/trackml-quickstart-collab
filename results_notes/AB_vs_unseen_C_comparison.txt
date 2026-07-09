@@ -1,0 +1,19 @@
+AB internal evaluation vs unseen C generalization
+
+AB internal evaluation:
+Signal efficiency: 0.900
+Quirk efficiency: 0.900
+Anti-quirk efficiency: 0.900
+Fake rate: 0.058
+Duplication rate: 0.000
+
+Unseen C evaluation:
+Signal efficiency: 0.935
+Quirk efficiency: 0.940
+Anti-quirk efficiency: 0.930
+Fake rate: 0.041
+Duplication rate: 0.000
+
+Conclusion:
+The two-configuration training setup generalizes well to the unseen C configuration.
+Unseen C performance is not degraded relative to the AB internal evaluation; it is slightly better in this run.
