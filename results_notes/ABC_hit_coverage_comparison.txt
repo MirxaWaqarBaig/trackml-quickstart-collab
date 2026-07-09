@@ -1,0 +1,51 @@
+A/B/C Hit Coverage Comparison
+
+Dataset A:
+mQ = 500 GeV
+Lambda = 900 eV
+pair_pt = 50 GeV
+Total source counts:
+SM = 50000
+Quirk = 1000
+Anti-quirk = 1000
+Average per event:
+SM = 500.0
+Quirk = 10.0
+Anti-quirk = 10.0
+Quirk min/max = 10/10
+Anti-quirk min/max = 10/10
+
+Dataset B:
+mQ = 1000 GeV
+Lambda = 700 eV
+pair_pt = 80 GeV
+Total source counts:
+SM = 50000
+Quirk = 900
+Anti-quirk = 900
+Average per event:
+SM = 500.0
+Quirk = 9.0
+Anti-quirk = 9.0
+Quirk min/max = 9/9
+Anti-quirk min/max = 9/9
+
+Dataset C:
+mQ = 700 GeV
+Lambda = 1100 eV
+pair_pt = 50 GeV
+Total source counts:
+SM = 50000
+Quirk = 892
+Anti-quirk = 892
+Average per event:
+SM = 500.0
+Quirk = 8.92
+Anti-quirk = 8.92
+Quirk min/max = 8/9
+Anti-quirk min/max = 8/9
+
+Interpretation:
+The unseen C dataset has balanced quirk and anti-quirk hit coverage, comparable to A and B.
+Therefore, the lower unseen C reconstruction performance is not explained by missing or highly imbalanced hit statistics.
+The drop from AB signal efficiency 91.0% to unseen C signal efficiency 41.0% likely reflects limited extrapolation to a different quirk trajectory regime.
