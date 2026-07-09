@@ -1,0 +1,47 @@
+Step 6 AB Retrained Reconstruction Result
+Branch: module-intersection-cylinder-all-masses
+Training dataset: quirk_train_AB_500_900_pt50__1000_700_pt80
+
+Dataset A:
+mQ = 500 GeV
+Lambda = 900 eV
+pair_pt = 50 GeV
+events = 100
+
+Dataset B:
+mQ = 1000 GeV
+Lambda = 700 eV
+pair_pt = 80 GeV
+events = 100
+
+AB split:
+train_split = [160, 20, 20]
+datatype_split = [160, 20, 20]
+
+Result:
+Number of reconstructed particles: 182
+Number of particles: 4338
+
+Quirk particles: 100
+Reconstructed quirk particles: 91
+Quirk efficiency: 0.910
+
+Anti-quirk particles: 100
+Reconstructed anti-quirk particles: 91
+Anti-quirk efficiency: 0.910
+
+Signal particles quirk plus anti-quirk: 200
+Reconstructed signal particles: 182
+Signal efficiency: 0.910
+
+SM particles: 4138
+Reconstructed SM particles: 0
+SM reconstruction rate: 0.000
+
+Number of matched tracks: 182
+Number of tracks: 192
+Number of duplicate reconstructed particles: 0
+
+Overall efficiency: 0.042
+Fake rate: 0.052
+Duplication rate: 0.000
