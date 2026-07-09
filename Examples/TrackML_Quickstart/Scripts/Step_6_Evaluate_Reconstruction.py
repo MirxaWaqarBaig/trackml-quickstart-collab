@@ -252,6 +252,8 @@ def evaluate(config_file="pipeline_config.yaml"):
 
 if __name__ == "__main__":
 
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s:%(message)s")
+
     args = parse_args()
     config_file = args.config
 
