@@ -1,0 +1,36 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:------------ Step 6: Evaluating the track reconstruction performance ------------
+INFO:--------------------------- a) Loading labelled graphs ---------------------------
+  0%|          | 0/100 [00:00<?, ?it/s]  8%|▊         | 8/100 [00:00<00:01, 72.76it/s] 16%|█▌        | 16/100 [00:00<00:01, 74.52it/s] 24%|██▍       | 24/100 [00:00<00:01, 74.57it/s] 32%|███▏      | 32/100 [00:00<00:00, 74.68it/s] 40%|████      | 40/100 [00:00<00:00, 74.68it/s] 48%|████▊     | 48/100 [00:00<00:00, 74.78it/s] 56%|█████▌    | 56/100 [00:00<00:00, 74.95it/s] 64%|██████▍   | 64/100 [00:00<00:00, 75.15it/s] 72%|███████▏  | 72/100 [00:00<00:00, 75.05it/s] 80%|████████  | 80/100 [00:01<00:00, 74.23it/s] 88%|████████▊ | 88/100 [00:01<00:00, 74.66it/s] 96%|█████████▌| 96/100 [00:01<00:00, 74.93it/s]100%|██████████| 100/100 [00:01<00:00, 74.74it/s]
+INFO:--------------------- b) Calculating the performance metrics ---------------------
+INFO:Number of reconstructed particles: 161
+INFO:Number of particles: 4338
+INFO:===== Source-separated reconstruction =====
+INFO:Quirk particles: 100
+INFO:Reconstructed quirk particles: 79
+INFO:Quirk efficiency: 0.790
+INFO:Anti-quirk particles: 100
+INFO:Reconstructed anti-quirk particles: 82
+INFO:Anti-quirk efficiency: 0.820
+INFO:Signal particles quirk plus anti-quirk: 200
+INFO:Reconstructed signal particles: 161
+INFO:Signal efficiency: 0.805
+INFO:SM particles: 4138
+INFO:Reconstructed SM particles: 0
+INFO:SM reconstruction rate: 0.000
+INFO:Number of matched tracks: 161
+INFO:Number of tracks: 169
+INFO:Number of duplicate reconstructed particles: 0
+INFO:Efficiency: 0.037
+INFO:Fake rate: 0.047
+INFO:Duplication rate: 0.000
+INFO:------------------------------ c) Plotting results ------------------------------

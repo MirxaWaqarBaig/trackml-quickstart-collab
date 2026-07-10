@@ -1,0 +1,79 @@
+ABDE v2 Generalization Study Summary
+Branch: module-intersection-cylinder-all-masses
+
+Goal:
+Improve generalization to unseen C without directly training on C.
+
+Training datasets:
+A: mQ = 500 GeV, Lambda = 900 eV, pair_pt = 50 GeV
+B: mQ = 1000 GeV, Lambda = 700 eV, pair_pt = 80 GeV
+D: mQ = 700 GeV, Lambda = 900 eV, pair_pt = 50 GeV
+E: mQ = 500 GeV, Lambda = 1100 eV, pair_pt = 50 GeV
+
+Unseen test dataset:
+C: mQ = 700 GeV, Lambda = 1100 eV, pair_pt = 50 GeV
+
+Baseline AB-only internal result:
+Signal efficiency = 91.0%
+Fake rate = 5.2%
+Duplication rate = 0.0%
+
+Baseline AB-only unseen C result:
+Quirk efficiency = 26.0%
+Anti-quirk efficiency = 56.0%
+Signal efficiency = 41.0%
+Fake rate = 32.5%
+Duplication rate = 3.7%
+
+ABDE v2 internal result:
+Number of reconstructed particles = 161
+Number of particles = 4338
+Quirk particles = 100
+Reconstructed quirk particles = 79
+Quirk efficiency = 79.0%
+Anti-quirk particles = 100
+Reconstructed anti-quirk particles = 82
+Anti-quirk efficiency = 82.0%
+Signal particles = 200
+Reconstructed signal particles = 161
+Signal efficiency = 80.5%
+SM particles = 4138
+Reconstructed SM particles = 0
+SM reconstruction rate = 0.0%
+Matched tracks = 161
+Tracks = 169
+Duplicate reconstructed particles = 0
+Overall efficiency = 3.7%
+Fake rate = 4.7%
+Duplication rate = 0.0%
+
+ABDE v2 unseen C result:
+Number of reconstructed particles = 125
+Number of particles = 4338
+Quirk particles = 100
+Reconstructed quirk particles = 52
+Quirk efficiency = 52.0%
+Anti-quirk particles = 100
+Reconstructed anti-quirk particles = 73
+Anti-quirk efficiency = 73.0%
+Signal particles = 200
+Reconstructed signal particles = 125
+Signal efficiency = 62.5%
+SM particles = 4138
+Reconstructed SM particles = 0
+SM reconstruction rate = 0.0%
+Matched tracks = 125
+Tracks = 143
+Duplicate reconstructed particles = 0
+Overall efficiency = 2.9%
+Fake rate = 12.6%
+Duplication rate = 0.0%
+
+Improvement on unseen C:
+Signal efficiency improved from 41.0% to 62.5%.
+Fake rate reduced from 32.5% to 12.6%.
+Duplication rate reduced from 3.7% to 0.0%.
+
+Interpretation:
+Adding nearby but not identical parameter points D and E improves generalization to unseen C.
+This suggests that the earlier C failure was due to limited parameter-space coverage in the learned embedding/GNN decision space, not missing hit coverage.
