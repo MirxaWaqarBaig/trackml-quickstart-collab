@@ -58,8 +58,11 @@ def main():
     with open(cfg_path) as handle:
         hparams = yaml.load(handle, Loader=yaml.FullLoader)
 
-    # Force output into this quickstart copy so notebook can consume directly.
-    hparams["output_dir"] = str(quickstart_dir / "datasets" / "quickstart_quirk_example")
+    # Use the output directory defined in the selected YAML config.
+    output_dir = Path(hparams["output_dir"])
+    if not output_dir.is_absolute():
+        output_dir = repo_root / output_dir
+    hparams["output_dir"] = str(output_dir.resolve())
     if args.n_files is not None:
         hparams["n_files"] = int(args.n_files)
     if args.detector_path is not None:
