@@ -187,14 +187,18 @@ def evaluate(config_file="pipeline_config.yaml"):
     logging.info(f"Duplication rate: {dup_rate:.3f}")
 
     # ============================================================
-    # Source-split metrics
+    # Source-separated metrics
     # source: 0 = SM background, 1 = quirk, 2 = anti-quirk
     # ============================================================
 
-    quirk_particles = particles[particles["source"] > 0]
+    quirk_particles = particles[particles["source"] == 1]
+    anti_quirk_particles = particles[particles["source"] == 2]
+    signal_particles = particles[particles["source"] > 0]
     sm_particles = particles[particles["source"] == 0]
 
-    reconstructed_quirk_particles = reconstructed_particles[reconstructed_particles["source"] > 0]
+    reconstructed_quirk_particles = reconstructed_particles[reconstructed_particles["source"] == 1]
+    reconstructed_anti_quirk_particles = reconstructed_particles[reconstructed_particles["source"] == 2]
+    reconstructed_signal_particles = reconstructed_particles[reconstructed_particles["source"] > 0]
     reconstructed_sm_particles = reconstructed_particles[reconstructed_particles["source"] == 0]
 
     n_quirk_particles = len(
@@ -202,6 +206,20 @@ def evaluate(config_file="pipeline_config.yaml"):
     )
     n_reconstructed_quirk_particles = len(
         reconstructed_quirk_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+
+    n_anti_quirk_particles = len(
+        anti_quirk_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+    n_reconstructed_anti_quirk_particles = len(
+        reconstructed_anti_quirk_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+
+    n_signal_particles = len(
+        signal_particles.drop_duplicates(subset=["event_id", "particle_id"])
+    )
+    n_reconstructed_signal_particles = len(
+        reconstructed_signal_particles.drop_duplicates(subset=["event_id", "particle_id"])
     )
 
     n_sm_particles = len(
@@ -215,24 +233,42 @@ def evaluate(config_file="pipeline_config.yaml"):
         n_reconstructed_quirk_particles / n_quirk_particles
         if n_quirk_particles > 0 else 0.0
     )
-    sm_eff = (
+    anti_quirk_eff = (
+        n_reconstructed_anti_quirk_particles / n_anti_quirk_particles
+        if n_anti_quirk_particles > 0 else 0.0
+    )
+    signal_eff = (
+        n_reconstructed_signal_particles / n_signal_particles
+        if n_signal_particles > 0 else 0.0
+    )
+    sm_reco_rate = (
         n_reconstructed_sm_particles / n_sm_particles
         if n_sm_particles > 0 else 0.0
     )
 
-    logging.info(headline("Source-split reconstruction metrics"))
-    logging.info(f"Number of quirk particles: {n_quirk_particles}")
-    logging.info(f"Number of reconstructed quirk particles: {n_reconstructed_quirk_particles}")
-    logging.info(f"Quirk-only efficiency: {quirk_eff:.3f}")
+    logging.info(headline("Source-separated reconstruction metrics"))
 
-    logging.info(f"Number of SM particles: {n_sm_particles}")
-    logging.info(f"Number of reconstructed SM particles: {n_reconstructed_sm_particles}")
-    logging.info(f"SM-only efficiency: {sm_eff:.3f}")
+    logging.info(f"Quirk particles: {n_quirk_particles}")
+    logging.info(f"Reconstructed quirk particles: {n_reconstructed_quirk_particles}")
+    logging.info(f"Quirk efficiency: {quirk_eff:.3f}")
+
+    logging.info(f"Anti-quirk particles: {n_anti_quirk_particles}")
+    logging.info(f"Reconstructed anti-quirk particles: {n_reconstructed_anti_quirk_particles}")
+    logging.info(f"Anti-quirk efficiency: {anti_quirk_eff:.3f}")
+
+    logging.info(f"Signal particles quirk plus anti-quirk: {n_signal_particles}")
+    logging.info(f"Reconstructed signal particles: {n_reconstructed_signal_particles}")
+    logging.info(f"Signal efficiency: {signal_eff:.3f}")
+
+    logging.info(f"SM particles: {n_sm_particles}")
+    logging.info(f"Reconstructed SM particles: {n_reconstructed_sm_particles}")
+    logging.info(f"SM reconstruction rate: {sm_reco_rate:.3f}")
 
     logging.info(
         f"Reconstructed split check: quirk {n_reconstructed_quirk_particles} + "
+        f"anti-quirk {n_reconstructed_anti_quirk_particles} + "
         f"SM {n_reconstructed_sm_particles} = "
-        f"{n_reconstructed_quirk_particles + n_reconstructed_sm_particles}"
+        f"{n_reconstructed_quirk_particles + n_reconstructed_anti_quirk_particles + n_reconstructed_sm_particles}"
     )
 
     logging.info(headline("c) Plotting results"))
