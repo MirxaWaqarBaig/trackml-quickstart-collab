@@ -46,7 +46,7 @@ quirk_opening_angle_jitter: 0.35
 quirk_origin_jitter_mm: 40.0
 min_quirk_hits_per_track: 10
 min_total_quirk_hits: 20
-quirk_event_max_retries: 3
+quirk_event_max_retries: 20
 
 # SM background mixing
 
