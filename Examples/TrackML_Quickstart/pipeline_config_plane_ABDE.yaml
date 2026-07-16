@@ -1,0 +1,94 @@
+common_configs:
+  experiment_name: plane_generalization_ABDE
+  artifact_directory: artifacts/plane_generalization_ABDE
+  gpus: 1
+  clear_directories: true
+metric_learning_configs:
+  input_dir: datasets/plane_generalization_ABDE
+  output_dir: datasets/plane_ABDE_metric_learning_processed
+  pt_signal_cut: 1.0
+  pt_background_cut: 1.0
+  train_split: &id001
+  - 360
+  - 40
+  - 0
+  true_edges: modulewise_true_edges
+  quirky_transform: false
+  quirky_amplitude: 0.003
+  quirky_frequency: 4.0
+  quirky_mode: phi_only
+  adaptive_edge_filter: true
+  adaptive_dr_mm: 180.0
+  adaptive_dphi_mm: 180.0
+  adaptive_dz_mm: 260.0
+  adaptive_pt_coeff: 120.0
+  quirk_coord_dr_mm: 200.0
+  quirk_coord_dphi_mm: 250.0
+  quirk_coord_dz_mm: 600.0
+  quirk_loss_weight: 10.0
+  spatial_channels: 3
+  cell_channels: 0
+  emb_hidden: 1024
+  nb_layer: 4
+  emb_dim: 12
+  activation: Tanh
+  weight: 2
+  randomisation: 2
+  points_per_batch: 100000
+  r_train: 0.1
+  r_val: 0.1
+  r_test: 0.009
+  knn_max_inference: 120
+  knn: 10
+  warmup: 8
+  margin: 0.1
+  lr: 0.001
+  factor: 0.85
+  patience: 8
+  regime:
+  - rp
+  - hnm
+  - norm
+  max_epochs: 50
+gnn_configs:
+  input_dir: datasets/plane_ABDE_metric_learning_processed
+  output_dir: datasets/plane_ABDE_gnn_processed
+  edge_cut: 0.75
+  pt_signal_min: 1.0
+  pt_background_min: 1.0
+  datatype_names:
+  - train
+  - val
+  datatype_split: *id001
+  noise: false
+  spatial_channels: 3
+  cell_channels: 0
+  hidden: 96
+  n_graph_iters: 4
+  nb_node_layer: 2
+  nb_edge_layer: 2
+  precision: 16
+  layernorm: true
+  aggregation: sum_max
+  hidden_activation: SiLU
+  weight: 2
+  warmup: 10
+  lr: 0.002
+  factor: 0.7
+  patience: 8
+  truth_key: pid_signal
+  regime:
+  - pid
+  mask_background: true
+  max_epochs: 30
+track_building_configs:
+  score_cut: 0.75
+  output_dir: datasets/plane_ABDE_track_building_processed
+evaluation_configs:
+  output_dir: datasets/plane_ABDE_evaluation
+  min_pt: 5
+  max_eta: 4
+  min_track_length: 6
+  min_particle_length: 6
+  matching_fraction: 0.5
+  matching_style: ATLAS
