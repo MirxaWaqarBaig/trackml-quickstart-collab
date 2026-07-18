@@ -37,23 +37,17 @@ class EmbeddingInferenceBuilder:
                 for event in tqdm(dataset):
                     
                     event_file = os.path.join(self.input_dir, event)
-                    event_name = os.path.basename(event_file)
-
                     if (
                         not os.path.exists(
                             os.path.join(
-                                self.output_dir, datatype, event_name
+                                self.output_dir, datatype, event_file[-4:]
                             )
                         )
                     ) or self.overwrite:
                         batch = torch.load(
                             event_file,
                             weights_only=False,
-                        )
-
-                        batch.event_file = event_file
-                        batch = batch.to(self.model.device)
-
+                        ).to(self.model.device)
                         self.construct_downstream(batch, datatype)
 
     def prepare_datastructure(self):

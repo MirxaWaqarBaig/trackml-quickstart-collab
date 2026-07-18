@@ -1,0 +1,12 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+Building quirk feature store with config: /home/rafia/trackml-quickstart-collab/Pipelines/TrackML_Example/LightningModules/Processing/prepare_quirk_plane_D_700_900_pt50.yaml
+Output directory: /home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/datasets/plane_D_700_900_pt50
+Number of events: 100
+Detector path: /home/rafia/trackml_raw/detectors.csv
+TrackML input dir: /home/rafia/trackml_raw/train_all
+Loading detector...
+Detector loaded.
+Writing outputs to /home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/datasets/plane_D_700_900_pt50
+  0%|          | 0/100 [00:00<?, ?it/s]  1%|          | 1/100 [00:24<40:43, 24.69s/it]  3%|▎         | 3/100 [00:45<22:52, 14.15s/it]  5%|▌         | 5/100 [00:45<11:00,  6.96s/it] 10%|█         | 10/100 [00:51<04:43,  3.15s/it] 14%|█▍        | 14/100 [01:29<08:27,  5.90s/it] 26%|██▌       | 26/100 [02:19<05:52,  4.76s/it] 41%|████      | 41/100 [02:43<03:00,  3.06s/it] 64%|██████▍   | 64/100 [02:57<01:02,  1.74s/it] 74%|███████▍  | 74/100 [03:19<00:48,  1.86s/it] 89%|████████▉ | 89/100 [03:26<00:15,  1.38s/it] 94%|█████████▍| 94/100 [03:31<00:07,  1.33s/it] 95%|█████████▌| 95/100 [03:34<00:06,  1.39s/it] 96%|█████████▌| 96/100 [04:09<00:12,  3.16s/it] 97%|█████████▋| 97/100 [04:43<00:15,  5.30s/it]100%|██████████| 100/100 [04:43<00:00,  2.83s/it]
+Done. Quirk feature store generation complete.

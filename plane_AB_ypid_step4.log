@@ -1,0 +1,24 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:--------------------- Step 4: Scoring graph edges using GNN  ---------------------
+INFO:---------------------------- a) Loading trained model ----------------------------
+INFO:----------------------------- b) Running inferencing -----------------------------
+Training finished, running inference to filter graphs...
+Building train
+  0%|          | 0/160 [00:00<?, ?it/s]/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/torch/utils/checkpoint.py:87: UserWarning: None of the inputs have requires_grad=True. Gradients will be None
+  warnings.warn(
+  1%|          | 1/160 [00:00<00:53,  2.97it/s] 15%|█▌        | 24/160 [00:00<00:01, 70.38it/s] 30%|███       | 48/160 [00:00<00:00, 119.94it/s] 45%|████▌     | 72/160 [00:00<00:00, 154.55it/s] 60%|██████    | 96/160 [00:00<00:00, 178.27it/s] 75%|███████▌  | 120/160 [00:00<00:00, 194.44it/s] 90%|█████████ | 144/160 [00:00<00:00, 205.34it/s]100%|██████████| 160/160 [00:01<00:00, 156.40it/s]
+Building val
+  0%|          | 0/20 [00:00<?, ?it/s]100%|██████████| 20/20 [00:00<00:00, 230.17it/s]
+Building test
+  0%|          | 0/20 [00:00<?, ?it/s]100%|██████████| 20/20 [00:00<00:00, 234.54it/s]

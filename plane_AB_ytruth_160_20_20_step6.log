@@ -1,0 +1,25 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:------------ Step 6: Evaluating the track reconstruction performance ------------
+INFO:--------------------------- a) Loading labelled graphs ---------------------------
+  0%|          | 0/200 [00:00<?, ?it/s]  6%|▌         | 12/200 [00:00<00:01, 113.47it/s] 12%|█▏        | 24/200 [00:00<00:01, 115.90it/s] 18%|█▊        | 36/200 [00:00<00:01, 117.02it/s] 24%|██▍       | 48/200 [00:00<00:01, 117.27it/s] 30%|███       | 60/200 [00:00<00:01, 117.33it/s] 36%|███▌      | 72/200 [00:00<00:01, 116.84it/s] 42%|████▏     | 84/200 [00:00<00:00, 117.53it/s] 48%|████▊     | 96/200 [00:00<00:00, 117.84it/s] 54%|█████▍    | 108/200 [00:00<00:00, 118.03it/s] 60%|██████    | 120/200 [00:01<00:00, 116.68it/s] 66%|██████▌   | 132/200 [00:01<00:00, 116.84it/s] 72%|███████▏  | 144/200 [00:01<00:00, 117.28it/s] 78%|███████▊  | 156/200 [00:01<00:00, 117.46it/s] 84%|████████▍ | 168/200 [00:01<00:00, 117.45it/s] 90%|█████████ | 180/200 [00:01<00:00, 116.23it/s] 96%|█████████▌| 192/200 [00:01<00:00, 116.73it/s]100%|██████████| 200/200 [00:01<00:00, 117.04it/s]
+INFO:--------------------- b) Calculating the performance metrics ---------------------
+INFO:Number of reconstructed particles: 0
+INFO:Number of particles: 8676
+INFO:Number of matched tracks: 0
+INFO:Number of tracks: 0
+INFO:Number of duplicate reconstructed particles: 0
+Traceback (most recent call last):
+  File "<stdin>", line 11, in <module>
+  File "/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_6_Evaluate_Reconstruction.py", line 208, in evaluate
+    dup_rate = n_dup_reconstructed_particles / n_reconstructed_particles
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+ZeroDivisionError: division by zero

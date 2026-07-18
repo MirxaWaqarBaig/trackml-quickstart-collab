@@ -1,0 +1,14 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:-----------  Step 5: Building track candidates from the scored graph  -----------
+INFO:---------------------------- a) Loading scored graphs ----------------------------
+INFO:---------------------------- b) Labelling graph nodes ----------------------------
+  0%|          | 0/200 [00:00<?, ?it/s] 48%|████▊     | 96/200 [00:00<00:00, 952.37it/s] 96%|█████████▌| 192/200 [00:00<00:00, 473.20it/s]100%|██████████| 200/200 [00:00<00:00, 521.37it/s]

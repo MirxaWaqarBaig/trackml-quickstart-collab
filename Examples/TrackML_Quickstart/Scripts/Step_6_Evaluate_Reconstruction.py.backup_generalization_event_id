@@ -3,7 +3,6 @@ This script runs step 6 of the TrackML Quickstart example: Evaluating the track 
 """
 
 import os
-from pathlib import Path
 import yaml
 import argparse
 import logging
@@ -113,28 +112,7 @@ def evaluate_labelled_graph(graph_file, matching_fraction=0.5, matching_style="A
 
     # Get matching dataframe
     matching_df = get_matching_df(reconstruction_df, particles_df, min_track_length=min_track_length, min_particle_length=min_particle_length) 
-    event_name = Path(graph_file).name
-
-    try:
-        digits = "".join(c for c in event_name if c.isdigit())
-        event_id = int(digits) if digits else 0
-    except ValueError:
-        # Mixed generalization names such as 0000_A, 0000_B, 0000_D, 0000_E
-        stem_parts = event_name.split("_")
-        event_number = int(stem_parts[0])
-
-        source_codes = {
-            "A": 1,
-            "B": 2,
-            "C": 3,
-            "D": 4,
-            "E": 5,
-        }
-
-        source_tag = stem_parts[-1]
-        event_id = event_number * 10 + source_codes.get(source_tag, 9)
-
-    matching_df["event_id"] = event_id
+    matching_df["event_id"] = int(graph_file.split("/")[-1])
 
     # calculate matching fraction
     matching_df = calculate_matching_fraction(matching_df)
@@ -201,12 +179,8 @@ def evaluate(config_file="pipeline_config.yaml"):
 
     # Plot the results across pT and eta
     eff = n_reconstructed_particles / n_particles
-    fake_rate = (
-        1 - (n_matched_tracks / n_tracks)
-        if n_tracks > 0
-        else 0.0
-    )
-    dup_rate = (n_dup_reconstructed_particles / n_reconstructed_particles) if n_reconstructed_particles > 0 else 0.0
+    fake_rate = 1 - (n_matched_tracks / n_tracks)
+    dup_rate = n_dup_reconstructed_particles / n_reconstructed_particles
     
     logging.info(f"Efficiency: {eff:.3f}")
     logging.info(f"Fake rate: {fake_rate:.3f}")

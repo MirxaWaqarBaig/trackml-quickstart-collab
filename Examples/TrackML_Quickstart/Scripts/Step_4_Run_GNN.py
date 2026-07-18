@@ -44,7 +44,10 @@ def train(config_file="pipeline_config.yaml"):
     model.setup_data()
 
     logging.info(headline( "b) Running inferencing" ))
-    graph_scorer = GNNInferenceBuilder(model)
+    graph_scorer = GNNInferenceBuilder(
+        model,
+        output_dir=gnn_configs["output_dir"],
+    )
     graph_scorer.infer()
 
 if __name__ == "__main__":

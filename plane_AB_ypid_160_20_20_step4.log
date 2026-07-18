@@ -1,0 +1,19 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:--------------------- Step 4: Scoring graph edges using GNN  ---------------------
+Traceback (most recent call last):
+  File "/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_4_Run_GNN.py", line 58, in <module>
+    train(config_file) 
+    ^^^^^^^^^^^^^^^^^^
+  File "/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_4_Run_GNN.py", line 31, in train
+    with open(config_file) as file:
+         ^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: 'pipeline_config_plane_AB_ypid.yaml'

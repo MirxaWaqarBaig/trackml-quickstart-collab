@@ -1,0 +1,5 @@
+usage: Step_0_Build_Quirk_Feature_Store.py [-h] [--config CONFIG]
+                                           [--n-files N_FILES]
+                                           [--detector-path DETECTOR_PATH]
+                                           [--input-dir INPUT_DIR]
+Step_0_Build_Quirk_Feature_Store.py: error: unrecognized arguments: --output-dir Examples/TrackML_Quickstart/datasets/plane_A_500_900_pt50

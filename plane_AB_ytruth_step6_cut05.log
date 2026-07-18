@@ -1,0 +1,43 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:------------ Step 6: Evaluating the track reconstruction performance ------------
+INFO:--------------------------- a) Loading labelled graphs ---------------------------
+  0%|          | 0/200 [00:00<?, ?it/s]  6%|▌         | 12/200 [00:00<00:01, 110.08it/s] 12%|█▏        | 24/200 [00:00<00:01, 110.78it/s] 18%|█▊        | 36/200 [00:00<00:01, 111.44it/s] 24%|██▍       | 48/200 [00:00<00:01, 111.49it/s] 30%|███       | 60/200 [00:00<00:01, 112.99it/s] 36%|███▌      | 72/200 [00:00<00:01, 113.93it/s] 42%|████▏     | 84/200 [00:00<00:01, 114.41it/s] 48%|████▊     | 96/200 [00:00<00:00, 112.80it/s] 54%|█████▍    | 108/200 [00:00<00:00, 113.33it/s] 60%|██████    | 120/200 [00:01<00:00, 113.73it/s] 66%|██████▌   | 132/200 [00:01<00:00, 114.16it/s] 72%|███████▏  | 144/200 [00:01<00:00, 114.48it/s] 78%|███████▊  | 156/200 [00:01<00:00, 113.68it/s] 84%|████████▍ | 168/200 [00:01<00:00, 114.15it/s] 90%|█████████ | 180/200 [00:01<00:00, 114.31it/s] 96%|█████████▌| 192/200 [00:01<00:00, 114.50it/s]100%|██████████| 200/200 [00:01<00:00, 113.64it/s]
+INFO:--------------------- b) Calculating the performance metrics ---------------------
+INFO:Number of reconstructed particles: 119
+INFO:Number of particles: 4338
+INFO:Number of matched tracks: 147
+INFO:Number of tracks: 240
+INFO:Number of duplicate reconstructed particles: 47
+INFO:Efficiency: 0.027
+INFO:Fake rate: 0.387
+INFO:Duplication rate: 0.395
+INFO:-------------------- Source-separated reconstruction metrics --------------------
+INFO:Quirk particles: 100
+INFO:Reconstructed quirk particles: 62
+INFO:Quirk efficiency: 0.620
+INFO:Anti-quirk particles: 100
+INFO:Reconstructed anti-quirk particles: 54
+INFO:Anti-quirk efficiency: 0.540
+INFO:Signal particles quirk plus anti-quirk: 200
+INFO:Reconstructed signal particles: 116
+INFO:Signal efficiency: 0.580
+INFO:SM particles: 4138
+INFO:Reconstructed SM particles: 3
+INFO:SM reconstruction rate: 0.001
+INFO:Reconstructed split check: quirk 62 + anti-quirk 54 + SM 3 = 119
+INFO:------------------------------ c) Plotting results ------------------------------
+/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_6_Evaluate_Reconstruction.py:304: SettingWithCopyWarning: 
+A value is trying to be set on a copy of a slice from a DataFrame.
+Try using .loc[row_indexer,col_indexer] = value instead
+
+See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+  particles["is_reconstructed"] = particles["particle_id"].isin(grouped_reco_particles[grouped_reco_particles].index.values)

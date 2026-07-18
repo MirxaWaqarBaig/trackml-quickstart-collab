@@ -1,0 +1,35 @@
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/lightning_fabric/__init__.py:29: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  __import__("pkg_resources").declare_namespace(__name__)
+INFO:Loading faiss with AVX512 support.
+INFO:Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+INFO:Loading faiss with AVX2 support.
+INFO:Could not load library with AVX2 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx2'")
+INFO:Loading faiss.
+INFO:Successfully loaded faiss.
+INFO:--------------------- Step 4: Scoring graph edges using GNN  ---------------------
+INFO:---------------------------- a) Loading trained model ----------------------------
+INFO:----------------------------- b) Running inferencing -----------------------------
+Training finished, running inference to filter graphs...
+Building train
+  0%|          | 0/180 [00:00<?, ?it/s]/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py:745: UserWarning: torch.utils.checkpoint: the use_reentrant parameter should be passed explicitly. In version 2.5 we will raise an exception if use_reentrant is not passed. use_reentrant=False is recommended, but if you need to preserve the current default behavior, you can pass use_reentrant=True. Refer to docs for more details on the differences between the two variants.
+  return fn(*args, **kwargs)
+/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/torch/utils/checkpoint.py:87: UserWarning: None of the inputs have requires_grad=True. Gradients will be None
+  warnings.warn(
+  1%|          | 1/180 [00:00<00:55,  3.24it/s] 13%|█▎        | 24/180 [00:00<00:02, 74.73it/s] 27%|██▋       | 48/180 [00:00<00:01, 124.63it/s] 40%|████      | 72/180 [00:00<00:00, 157.04it/s] 53%|█████▎    | 95/180 [00:00<00:00, 177.05it/s] 66%|██████▌   | 118/180 [00:00<00:00, 192.55it/s] 78%|███████▊  | 141/180 [00:00<00:00, 202.42it/s] 91%|█████████ | 164/180 [00:01<00:00, 210.33it/s]100%|██████████| 180/180 [00:01<00:00, 162.76it/s]
+Building val
+  0%|          | 0/20 [00:00<?, ?it/s]100%|██████████| 20/20 [00:00<00:00, 216.20it/s]
+Building test
+0it [00:00, ?it/s]0it [00:00, ?it/s]
+Traceback (most recent call last):
+  File "/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_4_Run_GNN.py", line 55, in <module>
+    train(config_file) 
+    ^^^^^^^^^^^^^^^^^^
+  File "/home/rafia/trackml-quickstart-collab/Examples/TrackML_Quickstart/Scripts/Step_4_Run_GNN.py", line 48, in train
+    graph_scorer.infer()
+  File "/home/rafia/trackml-quickstart-collab/Pipelines/TrackML_Example/notebooks/build_gnn.py", line 43, in infer
+    for batch in tqdm(dataset):
+  File "/home/rafia/miniconda3/envs/trackml-quickstart/lib/python3.12/site-packages/tqdm/std.py", line 1181, in __iter__
+    for obj in iterable:
+TypeError: 'NoneType' object is not iterable

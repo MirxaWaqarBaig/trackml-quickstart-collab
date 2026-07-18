@@ -8,13 +8,9 @@ from tqdm import tqdm
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class GNNInferenceBuilder:
-    def __init__(self, model, overwrite=None, output_dir=None):
+    def __init__(self, model, overwrite=None):
         self.model = model
-        self.output_dir = (
-            output_dir
-            if output_dir is not None
-            else model.hparams["output_dir"]
-        )
+        self.output_dir = model.hparams["output_dir"]
         if overwrite is not None: 
             self.overwrite = overwrite
         elif "overwrite" in model.hparams:
