@@ -517,3 +517,164 @@ def compute_before_after_stats(track_xyz, detector_modules,
         "n_outside_boundary":   n_outside,
         "diag_log":             diag_log,
     }
+
+
+def build_barrel_layer_catalog(detector_modules, max_radial_spread_mm=10.0,
+                               min_z_span_mm=500.0):
+    """Derive ordered TrackML barrel layers directly from ``detectors.csv``.
+
+    Barrel layers have nearly constant cylindrical radius and extend over a
+    large z range.  Endcap disks instead have a broad radial span and a nearly
+    fixed z.  The returned table is ordered from the beam line outwards and
+    contains the real ``(volume_id, layer_id)`` identifiers.
+    """
+    required = {"volume_id", "layer_id", "cx", "cy", "cz"}
+    missing = required.difference(detector_modules.columns)
+    if missing:
+        raise ValueError(f"Detector table is missing columns: {sorted(missing)}")
+
+    rows = []
+    for (volume_id, layer_id), group in detector_modules.groupby(
+        ["volume_id", "layer_id"], sort=False
+    ):
+        radius = np.hypot(group["cx"].to_numpy(dtype=np.float64),
+                          group["cy"].to_numpy(dtype=np.float64))
+        z = group["cz"].to_numpy(dtype=np.float64)
+        radial_spread = float(radius.max() - radius.min())
+        z_span = float(z.max() - z.min())
+        if radial_spread > float(max_radial_spread_mm) or z_span < float(min_z_span_mm):
+            continue
+        half_v = (group["half_v"].to_numpy(dtype=np.float64)
+                  if "half_v" in group else np.zeros(len(group)))
+        rows.append({
+            "volume_id": int(volume_id),
+            "layer_id": int(layer_id),
+            "radius_mm": float(np.median(radius)),
+            "z_half_mm": float(np.max(np.abs(z)) + np.max(half_v)),
+            "n_modules": int(len(group)),
+        })
+
+    if len(rows) < 2:
+        raise ValueError("Could not identify at least two barrel layers from detector geometry")
+    catalog = pd.DataFrame(rows).sort_values("radius_mm").reset_index(drop=True)
+    catalog["analysis_layer"] = np.arange(1, len(catalog) + 1, dtype=np.int32)
+    return catalog
+
+
+def _build_layer_module_index(detector_modules):
+    """Group real TrackML modules by their true volume and layer IDs."""
+    layer_index = {}
+    for key, group in detector_modules.groupby(["volume_id", "layer_id"], sort=False):
+        layer_index[(int(key[0]), int(key[1]))] = {
+            "centers": group[["cx", "cy", "cz"]].to_numpy(dtype=np.float64),
+            "uvec": group[["ux", "uy", "uz"]].to_numpy(dtype=np.float64),
+            "vvec": group[["vx", "vy", "vz"]].to_numpy(dtype=np.float64),
+            "half_u": group["half_u"].to_numpy(dtype=np.float64),
+            "half_v": group["half_v"].to_numpy(dtype=np.float64),
+            "row_idx": group.index.to_numpy(dtype=np.int64),
+        }
+    return layer_index
+
+
+def intersect_track_with_cylinders_and_modules(
+    track_xyz,
+    detector_modules,
+    barrel_layers=None,
+    tolerance_mm=5.0,
+    max_hits=200,
+    sample_points=None,
+    min_gap_steps=3,
+):
+    """Intersect a trajectory with geometry-derived barrel cylinders.
+
+    Cylinder radii and z extents are derived from ``detectors.csv``.  A
+    crossing is retained only when it lies within the local active bounds of
+    a real module on that layer.  ``tolerance_mm`` and ``sample_points`` are
+    accepted for compatibility but do not relax the geometry.
+    """
+    del tolerance_mm, sample_points
+    track_xyz = np.asarray(track_xyz, dtype=np.float64)
+    if len(track_xyz) < 2:
+        return pd.DataFrame()
+
+    if barrel_layers is None:
+        barrel_layers = build_barrel_layer_catalog(detector_modules)
+    if isinstance(barrel_layers, pd.DataFrame):
+        layer_records = barrel_layers.to_dict("records")
+    else:
+        layer_records = list(barrel_layers)
+
+    layer_index = _build_layer_module_index(detector_modules)
+    rows = []
+    last_hit_step = {}
+
+    for i in range(len(track_xyz) - 1):
+        A, B = track_xyz[i], track_xyz[i + 1]
+        if not (np.all(np.isfinite(A)) and np.all(np.isfinite(B))):
+            continue
+        direction = B - A
+        dx, dy, dz = direction
+        a_coeff = dx * dx + dy * dy
+        if a_coeff < 1e-12:
+            continue
+        b_half = A[0] * dx + A[1] * dy
+        rA2 = A[0] * A[0] + A[1] * A[1]
+
+        for layer in layer_records:
+            if isinstance(layer, dict):
+                volume_id = int(layer["volume_id"])
+                layer_id = int(layer["layer_id"])
+                radius = float(layer["radius_mm"])
+                z_half = float(layer["z_half_mm"])
+                analysis_layer = int(layer.get("analysis_layer", 0))
+            else:
+                volume_id, layer_id, radius, z_half = layer[:4]
+                analysis_layer = 0
+            c_coeff = rA2 - radius * radius
+            discriminant = b_half * b_half - a_coeff * c_coeff
+            if discriminant < 0.0:
+                continue
+
+            for sign in (-1.0, 1.0):
+                t = (-b_half + sign * np.sqrt(discriminant)) / a_coeff
+                if not 0.0 <= t <= 1.0:
+                    continue
+                F = A + t * direction
+                if abs(F[2]) > z_half:
+                    continue
+                key = (volume_id, layer_id)
+                if key not in layer_index:
+                    continue
+                geometry = layer_index[key]
+                delta = F[None, :] - geometry["centers"]
+                local_u = np.einsum("ij,ij->i", delta, geometry["uvec"])
+                local_v = np.einsum("ij,ij->i", delta, geometry["vvec"])
+                inside = ((np.abs(local_u) <= geometry["half_u"]) &
+                          (np.abs(local_v) <= geometry["half_v"]))
+                candidates = np.flatnonzero(inside)
+                if not len(candidates):
+                    continue
+                best = int(candidates[np.argmin(np.sum(delta[candidates] ** 2, axis=1))])
+                global_row = int(geometry["row_idx"][best])
+                module = detector_modules.loc[global_row]
+                module_index = int(module.module_index)
+                if i - last_hit_step.get(module_index, -999999) < int(min_gap_steps):
+                    continue
+                last_hit_step[module_index] = i
+                rows.append({
+                    "hit_id": len(rows), "trajectory_step": int(i),
+                    "x": float(F[0]), "y": float(F[1]), "z": float(F[2]),
+                    "r": float(np.hypot(F[0], F[1])),
+                    "phi": float(np.arctan2(F[1], F[0])),
+                    "volume_id": volume_id, "layer_id": layer_id,
+                    "analysis_layer": analysis_layer,
+                    "module_id": int(module.module_id),
+                    "module_index": module_index,
+                    "local_u_mm": float(local_u[best]),
+                    "local_v_mm": float(local_v[best]),
+                    "distance_to_module": 0.0,
+                })
+                if len(rows) >= int(max_hits):
+                    return pd.DataFrame(rows)
+                break
+    return pd.DataFrame(rows) if rows else pd.DataFrame()

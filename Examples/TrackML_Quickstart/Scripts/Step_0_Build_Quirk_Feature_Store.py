@@ -34,6 +34,11 @@ def parse_args():
         default=None,
         help="Override TrackML input directory containing '*-hits.csv' files.",
     )
+    parser.add_argument(
+        "--output-dir",
+        default=None,
+        help="Override the YAML output directory for an isolated run.",
+    )
     return parser.parse_args()
 
 
@@ -69,6 +74,8 @@ def main():
         hparams["detector_path"] = str(Path(args.detector_path).resolve())
     if args.input_dir is not None:
         hparams["input_dir"] = str(Path(args.input_dir).resolve())
+    if args.output_dir is not None:
+        hparams["output_dir"] = str(Path(args.output_dir).resolve())
 
     os.makedirs(hparams["output_dir"], exist_ok=True)
 

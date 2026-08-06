@@ -11,7 +11,7 @@ Two implementations are provided:
    - Uncentred tensor T_ij = (1/(N-1)) * sum x_a^i * x_a^j  (from IP)
    - Two separate variables: delta_s (thickness) and delta_w (width) in mm
    - Two-stage algorithm: seed from outer layers -> iterative inside-out fit
-   - Final cuts: delta_s < 1.0 mm, delta_w < 10.0 mm, >=2 hits per layer
+   - Final cuts: delta_s < 0.1 mm, delta_w < 10.0 mm, >=2 hits per layer
 """
 
 import numpy as np
@@ -38,7 +38,7 @@ PAPER_DS_SEED_MM   = 0.5    # 0.05 cm — seeding stage thickness cut
 PAPER_DW_SEED_MM   = 10.0   # 1.0  cm — seeding stage width cut
 PAPER_DS_ITER_MM   = 0.5    # 0.05 cm — iterative stage plane tolerance
 PAPER_DW_ITER_MM   = 10.0   # 1.0  cm — iterative stage width tolerance
-PAPER_DS_FINAL_MM  = 1.0    # 0.1  cm — final selection thickness cut (relaxed for sim)
+PAPER_DS_FINAL_MM  = 0.1    # 0.01 cm — paper final selection thickness cut
 PAPER_DW_FINAL_MM  = 10.0   # 1.0  cm — final selection width cut
 PAPER_GROW_FACTOR  = 3.0    # max allowed growth of delta_s / delta_w when adding a hit
 PAPER_DPHI_SEED    = 0.1    # rad — max Δφ between seeding pair hits
@@ -92,6 +92,47 @@ def assign_layers(hits_xyz):
         mask = (r_mm >= r_lo) & (r_mm < r_hi)
         layer_ids[mask] = lyr
     return layer_ids
+
+
+def build_geometry_layer_map(detector_df, max_radial_spread_mm=10.0,
+                             min_z_span_mm=500.0):
+    """Map real TrackML barrel ``(volume_id, layer_id)`` pairs by radius.
+
+    The barrel/endcap distinction is derived from the geometry: a barrel has
+    nearly constant radius and a broad z span.  No volume IDs or radii are
+    hard-coded.  Values in the returned mapping run from 1 (innermost) to N
+    (outermost).
+    """
+    required = {"volume_id", "layer_id", "cx", "cy", "cz"}
+    missing = required.difference(detector_df.columns)
+    if missing:
+        raise ValueError(f"Detector table is missing columns: {sorted(missing)}")
+    layers = []
+    for key, group in detector_df.groupby(["volume_id", "layer_id"], sort=False):
+        radius = np.hypot(group["cx"].to_numpy(dtype=np.float64),
+                          group["cy"].to_numpy(dtype=np.float64))
+        z = group["cz"].to_numpy(dtype=np.float64)
+        if ((radius.max() - radius.min()) <= float(max_radial_spread_mm)
+                and (z.max() - z.min()) >= float(min_z_span_mm)):
+            layers.append((float(np.median(radius)), (int(key[0]), int(key[1]))))
+    layers.sort()
+    if len(layers) < 2:
+        raise ValueError("Could not identify at least two barrel layers")
+    return {key: rank for rank, (_, key) in enumerate(layers, start=1)}
+
+
+def assign_layers_from_geometry(module_indices, detector_df, layer_map=None):
+    """Assign feature-store hits using their exact detector module indices."""
+    if layer_map is None:
+        layer_map = build_geometry_layer_map(detector_df)
+    modules = np.asarray(module_indices, dtype=np.int64)
+    assigned = np.zeros(len(modules), dtype=np.int32)
+    if np.any(modules < 0) or np.any(modules >= len(detector_df)):
+        raise IndexError("Feature-store module index is outside detectors.csv")
+    selected = detector_df.iloc[modules][["volume_id", "layer_id"]]
+    for i, row in enumerate(selected.itertuples(index=False)):
+        assigned[i] = int(layer_map.get((int(row.volume_id), int(row.layer_id)), 0))
+    return assigned
 
 
 # ===========================================================================
@@ -300,7 +341,9 @@ def paper_plane_finding(hits_xyz, layer_ids=None,
                         min_hits_per_layer=2,
                         min_layers_with_2hits=None,
                         max_seed_pairs=50,
-                        max_seeds=500):
+                        max_seeds=500,
+                        dphi_seed=PAPER_DPHI_SEED,
+                        dz_seed_mm=PAPER_DZ_SEED_MM):
     """
     Full two-stage plane-finding algorithm from Knapen et al. 2017.
 
@@ -359,11 +402,14 @@ def paper_plane_finding(hits_xyz, layer_ids=None,
     second_layer = present_layers[-2]
 
     outer_pairs  = _seed_pairs(hits, layer_ids == outer_layer,
+                               dphi_cut=dphi_seed, dz_cut_mm=dz_seed_mm,
                                max_pairs=max_seed_pairs)
     second_pairs = _seed_pairs(hits, layer_ids == second_layer,
+                               dphi_cut=dphi_seed, dz_cut_mm=dz_seed_mm,
                                max_pairs=max_seed_pairs)
 
     best_result  = None
+    best_candidate = None
     best_ds      = np.inf
     n_seeds_tried = 0
 
@@ -421,16 +467,13 @@ def paper_plane_finding(hits_xyz, layer_ids=None,
                     if not ok2:
                         continue
                     t_n3 = _ensure_forward(hits[trial], t_n3)
-                    if (cur_ds > 0 and t_ds > grow_factor * cur_ds) or \
-                       (cur_dw > 0 and t_dw > grow_factor * cur_dw):
+                    ds_limit = grow_factor * max(cur_ds, np.finfo(float).eps)
+                    dw_limit = grow_factor * max(cur_dw, np.finfo(float).eps)
+                    if t_ds > ds_limit or t_dw > dw_limit:
                         continue
                     accepted = trial
                     cur_ds, cur_dw = t_ds, t_dw
                     cur_n1, cur_n2, cur_n3 = t_n1, t_n2, t_n3
-
-            # ── Evaluate this candidate plane ────────────────────────────
-            if cur_ds > ds_final or cur_dw > dw_final:
-                continue
 
             plane_idx   = np.array(accepted, dtype=np.int64)
             lyr_counts  = {}
@@ -439,6 +482,21 @@ def paper_plane_finding(hits_xyz, layer_ids=None,
                 lyr_counts[l] = lyr_counts.get(l, 0) + 1
             n_layers_2h = sum(1 for c in lyr_counts.values()
                               if c >= min_hits_per_layer)
+
+            candidate = dict(
+                found=False, delta_s=cur_ds, delta_w=cur_dw,
+                n1=cur_n1, n2=cur_n2, n3=cur_n3,
+                plane_hit_idx=plane_idx, n_plane_hits=len(plane_idx),
+                layer_counts=lyr_counts, n_layers_2hits=n_layers_2h,
+                seed_idx=seed_idx, outer_layer=int(outer_layer),
+                second_layer=int(second_layer), n_seeds_tried=n_seeds_tried,
+            )
+            if best_candidate is None or cur_ds < best_candidate["delta_s"]:
+                best_candidate = candidate
+
+            # ── Evaluate this candidate plane ────────────────────────────
+            if cur_ds > ds_final or cur_dw > dw_final:
+                continue
 
             if n_layers_2h < min_layers_with_2hits:
                 continue
@@ -455,18 +513,28 @@ def paper_plane_finding(hits_xyz, layer_ids=None,
                     layer_counts=lyr_counts,
                     n_layers_2hits=n_layers_2h,
                     seed_idx=seed_idx,
+                    outer_layer=int(outer_layer),
+                    second_layer=int(second_layer),
+                    n_seeds_tried=n_seeds_tried,
                 )
 
-    return best_result if best_result is not None else _empty_result()
+    if best_result is not None:
+        return best_result
+    if best_candidate is not None:
+        return best_candidate
+    return _empty_result(outer_layer=outer_layer, second_layer=second_layer,
+                         n_seeds_tried=n_seeds_tried)
 
 
-def _empty_result():
+def _empty_result(outer_layer=0, second_layer=0, n_seeds_tried=0):
     return dict(
         found=False, delta_s=np.nan, delta_w=np.nan,
         n1=None, n2=None, n3=None,
         plane_hit_idx=np.array([], dtype=np.int64),
         n_plane_hits=0, layer_counts={},
         n_layers_2hits=0, seed_idx=[],
+        outer_layer=int(outer_layer), second_layer=int(second_layer),
+        n_seeds_tried=int(n_seeds_tried),
     )
 
 
@@ -523,8 +591,18 @@ def roc_curve_points(scores_signal, scores_background, n_thresholds=200):
 
     Returns thresholds, tpr, fpr, auc.
     """
-    all_s  = np.concatenate([scores_signal, scores_background])
-    thrs   = np.linspace(all_s.min(), all_s.max(), n_thresholds)
+    scores_signal = np.asarray(scores_signal, dtype=np.float64)
+    scores_background = np.asarray(scores_background, dtype=np.float64)
+    all_s = np.concatenate([scores_signal, scores_background])
+    if not len(all_s):
+        raise ValueError("ROC calculation requires at least one score")
+    unique = np.unique(all_s)
+    if len(unique) <= n_thresholds - 2:
+        midpoints = (unique[:-1] + unique[1:]) / 2.0
+    else:
+        midpoints = np.linspace(all_s.min(), all_s.max(), n_thresholds - 2)
+    # Explicit endpoints make tied/constant classifiers produce AUC=0.5.
+    thrs = np.r_[-np.inf, midpoints, np.inf]
     tpr_l, fpr_l = [], []
     for thr in thrs:
         tp = (scores_signal    < thr).sum()
@@ -535,6 +613,6 @@ def roc_curve_points(scores_signal, scores_background, n_thresholds=200):
         fpr_l.append(fp / max(fp + tn, 1))
     tpr = np.array(tpr_l)
     fpr = np.array(fpr_l)
-    order = np.argsort(fpr)
+    order = np.lexsort((tpr, fpr))
     auc   = float(np.trapz(tpr[order], fpr[order]))
     return thrs, tpr, fpr, auc

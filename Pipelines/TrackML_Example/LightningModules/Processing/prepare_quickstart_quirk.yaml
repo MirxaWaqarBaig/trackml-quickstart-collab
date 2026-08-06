@@ -16,7 +16,9 @@ layerwise: True
 modulewise: True
 cell_information: False
 
-# Quirk generation parameters
+# Physical quirk simulator parameters.
+# Reference: quirk-module-intersection-cylinder (not the all-masses branch).
+# position = mm; time = ns; mass/momentum = GeV; B = tesla; Lambda = eV.
 
 quirk_n_steps: 70000
 quirk_t_max: 80.0
@@ -25,28 +27,28 @@ quirk_charge: 1.0
 quirk_mass: 500.0
 quirk_pair_pt: 50.0
 quirk_pair_pz: 10.0
-quirk_opening_angle: 1.2
-quirk_phi0: 0.0
+quirk_opening_angle: 1.3
+quirk_phi0: -0.75
 quirk_x0: 0.0
 quirk_y0: 0.0
 quirk_z0: 0.0
-quirk_string_tension: 30.0
+quirk_string_tension: 20.0
 quirk_oscillation_jitter: 0.0
 quirk_velocity_scale: 1.0
 quirk_tolerance_mm: 1000.0
-quirk_max_hits: 150
-quirk_sample_points: 800
+quirk_max_hits: 200
+quirk_sample_points: 2000
 quirk_pairs_per_event: 1
 quirk_pair_pt_jitter_frac: 0.05
 quirk_pair_phi_spread: 3.14159
-quirk_opening_angle_jitter: 0.35
-quirk_origin_jitter_mm: 40.0
-min_quirk_hits_per_track: 10
-min_total_quirk_hits: 20
-quirk_event_max_retries: 3
+quirk_opening_angle_jitter: 0.10
+quirk_origin_jitter_mm: 0.0
+min_quirk_hits_per_track: 4
+min_total_quirk_hits: 8
+quirk_event_max_retries: 30
 
 # SM background mixing
 
-include_sm_background: False
+include_sm_background: True
 sm_background_pt_min: 0.5
-sm_background_max_hits: 0
+sm_background_max_hits: 500
